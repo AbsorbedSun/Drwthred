@@ -1,0 +1,849 @@
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-touch-callout:none}
+:root{
+  /* Type scale — bumped ~+2px across the board vs the original desktop-dense
+     scale, for legibility on a tablet held at arm's length. */
+  --fs-5:7px;
+  --fs-55:7.5px;
+  --fs-6:8px;
+  --fs-65:8.5px;
+  --fs-7:9px;
+  --fs-75:9.5px;
+  --fs-8:10px;
+  --fs-85:10.5px;
+  --fs-9:11px;
+  --fs-10:12px;
+  --fs-11:13px;
+  --fs-12:14px;
+  --fs-14:16px;
+  --fs-16:18px;
+  /* Corner-radius scale — softened slightly for a cleaner, less technical look */
+  --r-2:3px;
+  --r-3:4px;
+  --r-4:5px;
+  --r-5:7px;
+  --r-6:8px;
+  --r-7:9px;
+  --r-8:10px;
+  --r-9:11px;
+  --r-10:13px;
+  --r-12:15px;
+  --r-14:17px;
+  --r-20:22px;
+  --bg:#f4f1ea;--bdr:#ddd7c8;--ink:#1a1a2e;--mut:#857c68;
+  --pan:rgba(255,253,248,.93);--tr:all .1s;
+  --thumb-bdr:#fff;--toast-bg:rgba(26,26,46,.85);--toast-fg:#e8dcc8;
+  --modal-bg:rgba(26,26,46,.35);--sgizmo-bg:rgba(244,241,234,0.78);
+}
+body[data-theme="dark"]{
+  --bg:#2a2a2e;--bdr:#505058;--ink:#e0e0e4;--mut:#999;
+  --pan:rgba(55,55,60,.95);
+  --thumb-bdr:#444;--toast-bg:rgba(224,224,228,.88);--toast-fg:#1a1a2e;
+  --modal-bg:rgba(0,0,0,.45);--sgizmo-bg:rgba(55,55,60,0.78);
+}
+body[data-theme="light"]{
+  --bg:#e8e8ec;--bdr:#c0c0c5;--ink:#1a1a2e;--mut:#666;
+  --pan:rgba(230,230,235,.95);
+  --thumb-bdr:#fff;--toast-bg:rgba(26,26,46,.85);--toast-fg:#e8dcc8;
+  --modal-bg:rgba(26,26,46,.35);--sgizmo-bg:rgba(230,230,235,0.78);
+}
+body[data-theme="eink"]{
+  --bg:#ffffff;--bdr:#222222;--ink:#000000;--mut:#333333;
+  --pan:#ffffff;
+  --thumb-bdr:#888;--toast-bg:rgba(0,0,0,.88);--toast-fg:#ffffff;
+  --modal-bg:rgba(0,0,0,.3);--sgizmo-bg:#ffffff;
+}
+body[data-theme="eink"] #cc::after{display:none}
+body[data-theme="eink"] .card{backdrop-filter:none;-webkit-backdrop-filter:none}
+body[data-theme="eink"] .btn:hover,body[data-theme="eink"] .btn.hover{background:transparent;border-color:#000;color:#000}
+body[data-theme="eink"] .btn.on{background:transparent;border:2px solid #000;color:#000;font-weight:600}
+body[data-theme="eink"] .gc-sel-btn{border:1px solid #444;background:transparent;color:#000}
+html{width:100%;height:100%;overflow:hidden;background:var(--bg)}
+body{position:fixed;inset:0;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;background:var(--bg)}
+body{font-family:'DM Mono',monospace}
+#cc{position:fixed;inset:0;background:var(--bg)}
+canvas{display:block}
+/* Paper grain — subtle fractal-noise texture over the whole viewport */
+#cc::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");background-size:200px}
+/* Page vignette — a faint darkening toward the corners, so the 3D canvas
+   reads as a sketchbook page/viewport rather than an infinite flat plane.
+   Signature detail; disabled on eink (pure white page, no shading). */
+#cc::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:1;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.10) 100%)}
+body[data-theme="eink"] #cc::before{display:none}
+
+/* ── Shared button ── */
+.btn{border:1px solid transparent;background:transparent;color:var(--mut);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;
+  transition:var(--tr);-webkit-tap-highlight-color:transparent;position:relative;flex-shrink:0;white-space:nowrap}
+.btn:hover,.btn.hover{background:color-mix(in srgb, var(--ink) 8%, transparent);color:var(--ink);border-color:color-mix(in srgb, var(--ink) 15%, transparent)}
+.btn.on{background:color-mix(in srgb, var(--ink) 12%, transparent);color:var(--ink);border-color:color-mix(in srgb, var(--ink) 30%, transparent)}
+.btn.on.mode::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:2px;background:var(--ink);border-radius:0 2px 2px 0;opacity:.6}
+.btn[data-k]::after{content:attr(data-k);position:absolute;bottom:2px;right:3px;font-size:var(--fs-5);color:var(--mut);opacity:.65}
+.btn.danger{color:#b03020}.btn.danger:hover,.btn.danger.hover{background:rgba(176,48,32,.08);border-color:rgba(176,48,32,.2);color:#b03020}
+.ax-x{color:#b03020}.ax-x.on,.ax-x:hover{color:#b03020;border-color:rgba(176,48,32,.3);background:rgba(176,48,32,.08)}
+.ax-y{color:#1a9940}.ax-y.on,.ax-y:hover{color:#1a9940;border-color:rgba(26,153,64,.3);background:rgba(26,153,64,.08)}
+.ax-z{color:#1e52a0}.ax-z.on,.ax-z:hover{color:#1e52a0;border-color:rgba(30,82,160,.3);background:rgba(30,82,160,.08)}
+.btn-sm{width:38px;height:38px;border-radius:var(--r-6)}
+.btn-md{width:42px;height:42px;border-radius:var(--r-7)}
+.btn-sm svg,.btn-md svg{width:16px;height:16px}
+.btn-pill{height:28px;padding:0 7px;border-radius:var(--r-14);font-size:var(--fs-7);letter-spacing:.05em}
+.gc-sel-btn{border:1px solid var(--bdr);background:color-mix(in srgb, var(--ink) 5%, transparent);color:var(--ink);font-size:var(--fs-7)}
+.partial-erase{box-shadow:inset 0 -2px 0 0 #c0392b}
+.btn-sft{flex:1;height:26px;padding:0 4px;border-radius:var(--r-4);font-size:var(--fs-7);border:1px solid var(--bdr);text-align:center}
+.card{background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r-10);box-shadow:0 2px 10px rgba(0,0,0,.07);backdrop-filter:blur(12px)}
+
+/* ── TOPBAR ── */
+#topbar{position:fixed;top:8px;left:50%;transform:translateX(-50%);display:flex;
+  align-items:center;gap:5px;z-index:200;padding:4px 8px;
+  max-width:calc(100vw - 96px);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+#topbar::-webkit-scrollbar{display:none}
+.tsep{width:1px;height:16px;background:var(--bdr);margin:0 3px;flex-shrink:0}
+
+/* ── HIDE-UI BUTTON (top-right, always visible) ── */
+#bhide{position:fixed;top:8px;right:8px;z-index:300;width:32px;height:32px;border-radius:var(--r-8)}
+
+/* ── SIDE COLUMN ── */
+:root{--SP:10px;--SR:auto}
+body.rside{--SP:auto;--SR:10px}
+#sidecol{position:fixed;left:var(--SP);right:var(--SR);top:52px;bottom:64px;z-index:200;
+  display:flex;flex-direction:column-reverse;gap:6px;align-items:stretch;
+  width:176px;overflow-y:auto;overflow-x:visible;
+  scrollbar-width:none;transition:opacity .15s,transform .15s}
+#sidecol::-webkit-scrollbar{display:none}
+#sidecol.collapsed{opacity:0;pointer-events:none;transform:translateX(-12px)}
+body.rside #sidecol.collapsed{transform:translateX(12px)}
+
+/* Grouped cards — two unified cards in sidecol.
+   Each group gets the card look; inner children drop their own card chrome
+   but keep separators between siblings. */
+.sc-group{background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r-10);
+  box-shadow:0 2px 10px rgba(0,0,0,.07);backdrop-filter:blur(12px);
+  display:flex;flex-direction:column-reverse;overflow:hidden;flex-shrink:0;position:relative}
+.sc-group > .card{background:transparent;border:none;box-shadow:none;border-radius:0;backdrop-filter:none}
+/* Separators between stacked children (not between groups) */
+.sc-group > .card + .card{border-bottom:1px solid var(--bdr)}
+/* column-reverse means "+ .card" is visually above, so border-bottom draws between them visually */
+
+/* When one group is detached, the remaining group must keep its original position.
+   In column-reverse flex, default packing is flex-start = visual bottom. Without these
+   rules, removing sg-bottom would cause sg-top to drop to the visual bottom. */
+#sidecol.no-bottom #sg-top{margin-bottom:auto}  /* push sg-top up → visual top */
+#sidecol.no-top #sg-bottom{margin-bottom:0}      /* sg-bottom stays at default (visual bottom) */
+#sg-bottom.gizmo-first #ghud{order:1}
+
+/* Top grab handle on each sc-group */
+.sc-grab{display:flex;align-items:center;justify-content:center;
+  padding:8px 6px;min-height:32px;cursor:grab;flex-shrink:0;
+  background:color-mix(in srgb, var(--ink) 3%, transparent);border-bottom:1px solid var(--bdr);
+  -webkit-tap-highlight-color:transparent;touch-action:none;
+  order:999;position:relative}
+.sc-grab:active{cursor:grabbing}
+.sc-grab::before{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:28px;height:3px;border-radius:var(--r-2);
+  background:var(--bdr);transition:background .1s;pointer-events:none}
+.sc-grab:hover::before,.sc-grab:active::before{background:var(--mut)}
+/* Spacer pushes buttons to the right */
+.sc-grab-spacer{flex:1}
+/* Card title — sits at far-left of grab handle, non-interactive so it never
+   blocks drag. Muted type, consistent with cyc-btn aesthetic. */
+.sc-title{font-size:var(--fs-7);letter-spacing:.12em;color:var(--mut);
+  font-weight:600;pointer-events:none;flex-shrink:0;
+  font-family:'DM Mono',monospace;line-height:1;
+  text-transform:uppercase;padding-left:2px}
+
+/* Detached (floating) sc-group */
+.sc-group.detached{position:fixed;z-index:260;width:176px;
+  box-shadow:0 8px 32px rgba(0,0,0,.28),0 2px 8px rgba(0,0,0,.12);overflow:visible}
+.sc-group.detached .sc-grab{cursor:grab}
+
+/* Close button (hide) — appears when detached, sits inside sc-grab */
+.sc-close{display:none;flex-shrink:0;margin-left:3px;
+  width:26px;height:26px;border-radius:var(--r-5);border:none;
+  background:transparent;color:var(--mut);font-size:var(--fs-11);cursor:pointer;
+  align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;
+  font-family:'DM Mono',monospace;line-height:1}
+.sc-group.detached .sc-close{display:flex}
+.sc-close:active{background:color-mix(in srgb, var(--ink) 10%, transparent);color:var(--ink)}
+/* Dock button — appears when detached */
+.sc-dock{display:none;flex-shrink:0;margin-left:3px;
+  width:26px;height:26px;border-radius:var(--r-5);border:none;
+  background:transparent;color:var(--mut);font-size:var(--fs-11);cursor:pointer;
+  align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;
+  font-family:'DM Mono',monospace;line-height:1}
+.sc-group.detached .sc-dock{display:flex}
+.sc-dock:active{background:color-mix(in srgb, var(--ink) 10%, transparent);color:var(--ink)}
+/* Swap button — always visible, toggles nav ↔ gizmo order */
+.sc-swap{display:flex;flex-shrink:0;margin-left:3px;
+  width:26px;height:26px;border-radius:var(--r-5);border:none;
+  background:transparent;color:var(--mut);font-size:var(--fs-11);cursor:pointer;
+  align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;
+  font-family:'DM Mono',monospace;line-height:1}
+.sc-swap:active{background:color-mix(in srgb, var(--ink) 10%, transparent);color:var(--ink)}
+
+/* Right-edge resize strip — anchored to bottom-right of detached cards.
+   Sits in the lower portion of the right edge so it's clearly a resize
+   handle (not a scroll target). Large touch target, no corner hunting. */
+.scale-dot{display:none;position:absolute;z-index:4;
+  bottom:0;right:-6px;width:12px;height:48px;
+  cursor:ew-resize;touch-action:none;-webkit-tap-highlight-color:transparent;
+  border-radius:0 0 10px 0}
+.scale-dot::after{content:'';position:absolute;
+  top:50%;left:50%;transform:translate(-50%,-50%);
+  width:3px;height:14px;border-radius:var(--r-2);
+  background:var(--bdr)}
+.scale-dot:hover::after,.scale-dot.dragging::after{background:var(--mut)}
+.sc-group.detached .scale-dot,#pb-float-card .scale-dot,#sgizmo .scale-dot{display:block}
+/* corner-br/bl: no-ops kept for compat */
+.scale-dot.corner-br,.scale-dot.corner-bl{}
+
+/* Dock-snap-ready hint — highlights a detached card when it's within redock range */
+.sc-group.detached.dock-snap-ready{outline:2px solid var(--ink);outline-offset:2px}
+
+/* UI hidden mode */
+body.ui-hidden #topbar,body.ui-hidden #sidecol,body.ui-hidden #stab,
+body.ui-hidden #sbar,body.ui-hidden #pages,body.ui-hidden #views,
+body.ui-hidden #narrow-bar,body.ui-hidden #selbadge,body.ui-hidden #sgizmo,body.ui-hidden #pgizmo,body.ui-hidden #prims-pop,body.ui-hidden #prim-bar{display:none!important}
+body.ui-hidden #bhide{opacity:.25}
+body.ui-hidden #bhide:hover{opacity:1}
+/* Detached tools card (sg-top) is redundant with ≡ bar when UI is hidden — hide it */
+body.ui-hidden.sc-detached #sg-top{display:none!important}
+/* Float card visible when UI hidden (narrow + tablet), never docked */
+body.ui-hidden #pb-float-card.fc-visible{display:flex}
+body.ui-hidden #pb-float-card.fc-docked-bottom{
+  left:8px!important;right:auto!important;bottom:auto!important;top:52px!important;
+  border-radius:var(--r-12)!important;border-bottom:1px solid var(--bdr)!important;
+  width:auto!important;box-shadow:0 4px 20px rgba(0,0,0,.22)!important}
+body.ui-hidden #pb-float-card.fc-docked-bottom #fc-resize{display:flex}
+body.ui-hidden #pb-float-card.fc-docked-bottom #fc-dock-btn{border-color:transparent;opacity:1}
+/* FAB still works when UI hidden */
+body.ui-hidden #pb-fab.fab-visible{display:flex}
+
+/* ── Hidden-UI mini-toolbar (v14.2, updated v28) ──
+   Appears when UI is hidden in ALL modes (including narrow-mode).
+   Toggle button at bottom-left; bar centered at bottom, hidden by default.      */
+#sc-hidden-toggle{display:none;position:fixed;z-index:300;left:10px;bottom:10px;
+  width:32px;height:32px;border-radius:var(--r-8);
+  background:var(--pan);border:1px solid var(--bdr);color:var(--ink);
+  box-shadow:0 2px 8px rgba(0,0,0,.14);backdrop-filter:blur(12px);
+  cursor:pointer;align-items:center;justify-content:center;
+  -webkit-tap-highlight-color:transparent;padding:0;transition:bottom .2s ease}
+#sc-hidden-toggle svg{display:block}
+#sc-hidden-toggle.lit{border-color:var(--ink);opacity:.85}
+body.ui-hidden #sc-hidden-toggle{display:flex}
+
+#sc-hidden-bar{display:none;position:fixed;z-index:299;left:50%;bottom:10px;
+  transform:translateX(-50%);
+  background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r-10);
+  box-shadow:0 4px 20px rgba(0,0,0,.18);backdrop-filter:blur(12px);
+  padding:5px 7px;gap:4px;align-items:center;
+  flex-wrap:nowrap;max-width:calc(100vw - 80px);overflow-x:auto;overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;touch-action:pan-x;
+  -webkit-tap-highlight-color:transparent}
+#sc-hidden-bar::-webkit-scrollbar{display:none}
+body.ui-hidden #sc-hidden-bar.scx-open{display:flex}
+
+/* ── Strip-open shift: bump bottom controls above open strips ── */
+body.views-open #sc-hidden-toggle{bottom:80px}
+body.views-open #sc-hidden-bar{bottom:80px}
+body.views-open #sbar{bottom:80px}
+body.views-open:not(.narrow-mode) #sidecol{bottom:140px}
+body.views-open.ui-hidden #lcl-float-group{bottom:124px!important}
+body.views-open.ui-hidden #sc-fab{bottom:166px!important}
+body.pages-open.views-open #sc-hidden-toggle{bottom:148px}
+body.pages-open.views-open #sc-hidden-bar{bottom:148px}
+body.pages-open.views-open #sbar{bottom:148px}
+body.pages-open.views-open:not(.narrow-mode) #sidecol{bottom:206px}
+body.pages-open.views-open.ui-hidden #lcl-float-group{bottom:192px!important}
+body.pages-open.views-open.ui-hidden #sc-fab{bottom:234px!important}
+body.pages-open:not(.views-open) #sc-hidden-toggle{bottom:80px}
+body.pages-open:not(.views-open) #sc-hidden-bar{bottom:80px}
+body.pages-open:not(.views-open) #sbar{bottom:80px}
+body.pages-open:not(.views-open):not(.narrow-mode) #sidecol{bottom:140px}
+body.pages-open:not(.views-open).ui-hidden #lcl-float-group{bottom:124px!important}
+body.pages-open:not(.views-open).ui-hidden #sc-fab{bottom:166px!important}
+#sc-hidden-bar .scx-sep{width:1px;height:18px;background:var(--bdr);flex-shrink:0;margin:0 1px}
+#sc-hidden-bar .btn-md{flex-shrink:0}
+#sc-hidden-bar .cw{width:22px;height:22px;flex-shrink:0}
+#sc-hidden-bar .bprev-btn{width:26px;height:30px;flex-shrink:0;flex-direction:column;gap:1px}
+
+/* ── FPS Nav Overlay ── */
+#fps-overlay{display:none;position:fixed;inset:0;z-index:250;pointer-events:none}
+body.fps-active #fps-overlay{display:block}
+/* Phantom-joystick hint ring — appears under the 3 fingers while walking,
+   fades on release. No fixed widget occupies the screen while idle. */
+#fps-move-hint{position:fixed;left:0;top:0;width:0;height:0;z-index:251;
+  pointer-events:none;opacity:0;transition:opacity .18s ease}
+#fps-move-hint.show{opacity:1}
+#fps-move-hint-ring{position:absolute;left:0;top:0;width:144px;height:144px;
+  margin:-72px 0 0 -72px;border-radius:50%;
+  border:1.5px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  background:color-mix(in srgb, var(--ink) 6%, transparent)}
+#fps-move-hint-knob{position:absolute;left:0;top:0;width:52px;height:52px;
+  margin:-26px 0 0 -26px;border-radius:50%;
+  background:color-mix(in srgb, var(--ink) 20%, transparent);
+  border:1.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
+  transition:transform .02s linear}
+/* FPS control panel inside the float card — gesture legend + vertical
+   buttons. Only visible in FPS; the NAV panel steps aside to give it room. */
+#pb-panel-look{display:none}
+body.fps-active #pb-panel-look{display:flex}
+body.fps-active #pb-panel-nav{display:none}
+#pb-panel-look .pb-panel-hdr span{text-align:center;cursor:default;border-color:transparent;font-size:var(--fs-6);letter-spacing:.1em}
+#fps-crosshair{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:249;width:20px;height:20px;pointer-events:none;opacity:.35;display:none}
+body.fps-active #fps-crosshair{display:block}
+#fps-crosshair svg{width:100%;height:100%}
+/* FPS exit: now lives inside #fps-plane-ctrl as last child */
+#fps-exit{height:36px;padding:0 10px;border-radius:var(--r-6);border:1px solid var(--bdr);
+  background:transparent;color:var(--ink);font-family:'DM Mono',monospace;font-size:var(--fs-8);
+  letter-spacing:.06em;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  gap:4px;width:100%;margin-top:2px}
+#fps-exit:active{background:color-mix(in srgb, var(--ink) 12%, transparent)}
+#pb-panel-look button.held,#pb-panel-look button:active{background:color-mix(in srgb, var(--ink) 15%, transparent);border-color:color-mix(in srgb, var(--ink) 30%, transparent)}
+/* FPS plane ctrl: under #bhide (eye), holds toggle + sliders + exit */
+#fps-plane-ctrl{position:fixed;top:48px;right:8px;z-index:251;
+  display:none;flex-direction:column;align-items:stretch;gap:6px;pointer-events:auto;
+  background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r-8);padding:8px 10px;
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);min-width:130px}
+body.fps-active #fps-plane-ctrl{display:flex}
+body.rside.fps-active #fps-plane-ctrl{right:auto;left:8px}
+body.fps-active #sc-fab{display:none!important}
+#fps-plane-toggle{height:28px;padding:0 8px;border-radius:var(--r-6);border:1px solid var(--bdr);
+  background:transparent;color:var(--ink);font-family:'DM Mono',monospace;font-size:var(--fs-7);
+  letter-spacing:.06em;cursor:pointer;display:flex;align-items:center;gap:3px;white-space:nowrap;width:100%}
+#fps-plane-toggle.on{background:var(--acc,#6c6);border-color:var(--acc,#6c6);color:#fff}
+#fps-plane-dist-wrap{display:none;flex-direction:column;gap:10px}
+#fps-plane-toggle.on ~ #fps-plane-dist-wrap{display:flex}
+.fps-slider-row{display:flex;align-items:center;gap:6px;padding:2px 0}
+.fps-slider-label{font-family:'DM Mono',monospace;font-size:var(--fs-65);color:var(--mut);white-space:nowrap;width:24px}
+.fps-slider{-webkit-appearance:none;flex:1;height:4px;background:var(--bdr);border-radius:var(--r-2);outline:none;cursor:pointer}
+.fps-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--ink);border:2px solid var(--thumb-bdr);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.fps-slider::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:var(--ink);border:2px solid var(--thumb-bdr)}
+
+/* Align-plane-to-view distance slider */
+#gview-dist-wrap{display:none;position:fixed;top:48px;left:50%;transform:translateX(-50%);z-index:260;
+  align-items:center;gap:8px;padding:8px 10px;
+  background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r-8);
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);min-width:180px;pointer-events:auto}
+#gview-dist-wrap.show{display:flex}
+
+/* Hide stab entirely when sidecol is fully undocked — no column to toggle */
+body.sc-detached #stab{display:none!important}
+
+/* Side toggle tab — pill-shaped, tap=collapse, horizontal drag=scale sidecol */
+#stab{position:fixed;z-index:200;cursor:grab;background:var(--pan);
+  border:1px solid var(--bdr);border-radius:var(--r-10);padding:4px 3px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  box-shadow:0 2px 8px rgba(0,0,0,.1);-webkit-tap-highlight-color:transparent;
+  touch-action:none;user-select:none;-webkit-user-select:none;height:32px;width:14px}
+#stab:active{cursor:grabbing}
+body.rside #stab{border-radius:var(--r-10);right:0;left:auto}
+#stab span{display:block;width:3px;height:16px;background:var(--ink);opacity:.3;border-radius:var(--r-2);transition:opacity .1s}
+#stab:hover span,#stab:active span{opacity:.6}
+#stab.resizing{background:color-mix(in srgb, var(--ink) 10%, transparent)}
+#stab.resizing span{opacity:.85}
+
+/* Side-switch button in status bar (bottom right of sbar) */
+#sb-sideswitch{background:transparent;border:1px solid transparent;border-radius:var(--r-4);
+  color:var(--mut);cursor:pointer;font-family:'DM Mono',monospace;font-size:var(--fs-75);
+  padding:1px 5px;margin-left:6px;letter-spacing:.05em;pointer-events:auto;
+  -webkit-tap-highlight-color:transparent;transition:background .1s,color .1s,border-color .1s}
+#sb-sideswitch:hover{background:color-mix(in srgb, var(--ink) 8%, transparent);color:var(--ink);border-color:color-mix(in srgb, var(--ink) 15%, transparent)}
+#sb-sideswitch:active{background:color-mix(in srgb, var(--ink) 14%, transparent)}
+
+
+/* Panels */
+#sidetools{display:flex;flex-direction:row;gap:4px;padding:6px 8px;flex-wrap:wrap;justify-content:center}
+#colors{display:flex;flex-direction:row;gap:4px;padding:8px 10px;justify-content:center;align-items:center}
+.cw{width:26px;height:26px;border-radius:var(--r-5);cursor:pointer;outline:2px solid transparent;outline-offset:2px;
+  transition:outline-color .1s,transform .1s;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.cw.on{outline-color:var(--ink)}.cw:hover,.cw.hover{transform:scale(1.07)}
+#ccpick-btn,#pb-ccpick-btn,#scx-ccpick-btn{transition:border-color .1s}
+#ccpick-btn:active,#pb-ccpick-btn:active,#scx-ccpick-btn:active{border-color:var(--ink)}
+
+/* Brush panel (see later — single #bpanel rule on line ~390) */
+.bslot{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 4px}
+.blbl{font-size:var(--fs-6);text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+.bsep{width:1px;background:var(--bdr);margin:4px 0}
+input[type=range].vr{-webkit-appearance:none;writing-mode:vertical-lr;direction:rtl;
+  width:4px;height:52px;background:var(--bdr);border-radius:var(--r-2);outline:none;cursor:pointer}
+input[type=range].vr::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;
+  border-radius:50%;background:var(--ink);border:2px solid var(--thumb-bdr)}
+.bval{font-size:var(--fs-7);color:var(--mut)}
+#navcube{display:block;cursor:grab;border-radius:var(--r-6)}
+#navcube:active{cursor:grabbing}
+
+
+#ghud{display:flex;flex-direction:column;gap:3px;padding:7px 8px}
+.srow{display:flex;gap:3px}
+#gc{display:block;cursor:crosshair;border-radius:var(--r-6);background:color-mix(in srgb, var(--ink) 2%, transparent);
+  border:1px solid var(--bdr);width:150px!important;height:130px!important;max-width:100%}
+#ghud-bottom{display:flex;align-items:center;gap:3px;margin-top:2px;flex-wrap:wrap;overflow:visible}
+#ghud-bottom .btn{flex-shrink:0;overflow:visible}
+#ghint{font-size:var(--fs-55);color:var(--mut);opacity:.65;width:100%;text-align:center;margin-top:1px}
+
+/* ── Floating LCL button group ── */
+/* Positioned by JS (positionLclFloat) — display controlled entirely by JS */
+#lcl-float-group{position:fixed;z-index:270;display:none;
+  align-items:center;gap:3px;pointer-events:auto}
+/* Narrow: always hidden — portrait panel has pb-glocal */
+body.narrow-mode #lcl-float-group{display:none!important}
+/* ui-hidden base position: above mini-toolbar toggle (10px gap + 32px toggle + breathing room) */
+body.ui-hidden #lcl-float-group{bottom:52px}
+#lcl-float,#lcl-snap{height:24px;padding:0 8px;border-radius:var(--r-12);
+  font-size:var(--fs-65);letter-spacing:.05em;white-space:nowrap}
+
+/* Layers */
+#layers{display:flex;flex-direction:column;gap:3px;padding:6px 8px}
+.lrow{display:flex;align-items:center;gap:4px}
+.leye{width:26px;height:26px;border-radius:var(--r-5);border:1px solid transparent;background:transparent;
+  cursor:pointer;font-size:var(--fs-9);display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:var(--tr);color:var(--mut);-webkit-tap-highlight-color:transparent}
+.leye:hover{background:color-mix(in srgb, var(--ink) 8%, transparent);color:var(--ink)}
+.leye.vis{color:var(--ink)}
+.lbtn{flex:1;height:28px;border-radius:var(--r-5);font-size:var(--fs-7);border:1px solid var(--bdr);background:transparent;
+  cursor:pointer;color:var(--mut);font-family:'DM Mono',monospace;transition:var(--tr);
+  display:flex;align-items:center;justify-content:flex-start;gap:4px;padding:0 5px}
+.lbtn:hover{background:color-mix(in srgb, var(--ink) 7%, transparent);color:var(--ink)}
+.lbtn.active{background:color-mix(in srgb, var(--ink) 14%, transparent);color:var(--ink);border-color:color-mix(in srgb, var(--ink) 35%, transparent);font-weight:500}
+.ldot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+/* ── STATUS BAR ── */
+#sbar{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);font-size:var(--fs-75);color:var(--mut);
+  background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r-6);padding:3px 9px;
+  pointer-events:none;letter-spacing:.04em;white-space:nowrap;box-shadow:0 1px 6px rgba(0,0,0,.05);z-index:100;
+  transition:bottom .2s ease}
+#mdot{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--ink);
+  margin-right:4px;vertical-align:middle;transition:background .2s}
+
+/* ── PAGES STRIP ── */
+#pages{position:fixed;bottom:0;left:0;right:0;height:64px;z-index:190;background:var(--pan);
+  border-top:1px solid var(--bdr);backdrop-filter:blur(12px);display:flex;align-items:center;
+  gap:8px;padding:0 14px;overflow-x:auto;overflow-y:visible;scrollbar-width:none;transform:translateY(100%);transition:transform .2s ease}
+#pages::-webkit-scrollbar{display:none}
+#pages.open{transform:translateY(0)}
+.pg-thumb{width:60px;height:42px;border-radius:var(--r-5);flex-shrink:0;cursor:pointer;
+  background:color-mix(in srgb, var(--ink) 4%, transparent);border:1px solid var(--bdr);position:relative;overflow:hidden;transition:border-color .1s,transform .1s}
+.pg-thumb:hover{transform:scale(1.04)}.pg-thumb.on{border-color:var(--ink);border-width:2px}
+.pg-thumb canvas,.pg-thumb img{width:100%;height:100%;display:block;border-radius:var(--r-4);object-fit:cover}
+.pg-num{position:absolute;bottom:2px;right:3px;font-size:var(--fs-6);color:var(--mut);opacity:.7}
+#pg-add{width:36px;height:36px;border-radius:var(--r-6);flex-shrink:0;font-size:var(--fs-16);
+  background:color-mix(in srgb, var(--ink) 6%, transparent);border:1px dashed var(--bdr);color:var(--mut);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--tr)}
+#pg-add:hover{background:color-mix(in srgb, var(--ink) 12%, transparent);color:var(--ink)}
+#pgbtn:hover{color:var(--ink)}.pgbtn.on{color:var(--ink);background:color-mix(in srgb, var(--ink) 10%, transparent)}
+.pg-thumb.editing{border-color:var(--ink);border-width:2px}
+.vw-thumb.editing{border-color:var(--ink);border-width:2px}
+.reorder-arrow{position:absolute;top:50%;width:20px;height:28px;border-radius:var(--r-4);border:none;
+  background:color-mix(in srgb, var(--ink) 70%, transparent);color:var(--toast-fg);font-size:var(--fs-10);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:11;
+  transform:translateY(-50%);-webkit-tap-highlight-color:transparent}
+.reorder-arrow.arr-l{left:-12px}.reorder-arrow.arr-r{right:-12px}
+body.narrow-mode:not(.ui-hidden) #pages{bottom:var(--pb-h,220px)}
+
+/* ── VIEWS STRIP ── */
+#views{position:fixed;bottom:0;left:0;right:0;height:64px;z-index:189;background:var(--pan);
+  border-top:1px solid var(--bdr);backdrop-filter:blur(12px);display:flex;align-items:center;
+  gap:8px;padding:0 14px;overflow-x:auto;overflow-y:visible;scrollbar-width:none;
+  transform:translateY(100%);transition:transform .2s ease}
+#views::-webkit-scrollbar{display:none}
+#views.open{transform:translateY(0)}
+#pages.open~#views.open,#views.open.pages-also-open{transform:translateY(-66px)}
+.vw-thumb{width:60px;height:42px;border-radius:var(--r-5);flex-shrink:0;cursor:pointer;
+  background:color-mix(in srgb, var(--ink) 4%, transparent);border:1px solid var(--bdr);position:relative;overflow:hidden;transition:border-color .1s,transform .1s}
+.vw-thumb:hover{transform:scale(1.04)}
+.vw-thumb img{width:100%;height:100%;display:block;border-radius:var(--r-4);object-fit:cover}
+.vw-num{position:absolute;bottom:2px;right:3px;font-size:var(--fs-6);color:var(--mut);opacity:.7}
+#vw-add{width:36px;height:36px;border-radius:var(--r-6);flex-shrink:0;font-size:var(--fs-16);
+  background:color-mix(in srgb, var(--ink) 6%, transparent);border:1px dashed var(--bdr);color:var(--mut);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--tr)}
+#vw-add:hover{background:color-mix(in srgb, var(--ink) 12%, transparent);color:var(--ink)}
+#vw-rec{width:36px;height:36px;border-radius:var(--r-6);flex-shrink:0;font-size:var(--fs-14);
+  background:rgba(224,48,64,.08);border:1px solid rgba(224,48,64,.35);color:#e03040;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;transition:var(--tr);
+  -webkit-tap-highlight-color:transparent}
+#vw-rec:hover{background:rgba(224,48,64,.18)}
+body.narrow-mode:not(.ui-hidden) #views{bottom:var(--pb-h,220px)}
+
+/* ── UI-HIDDEN views trigger button (next to bhide, only shown when UI hidden) ── */
+#bviews-hidden{position:fixed;top:8px;right:48px;z-index:300;width:32px;height:32px;border-radius:var(--r-8);display:none}
+body.ui-hidden #bviews-hidden{display:flex}
+/* Allow views strip to show during screen recording even when UI is hidden */
+body.ui-hidden #views.recording-open{display:flex!important;bottom:0}
+
+/* ── MERGE BUTTON in layers popover ── */
+.tb-merge{width:22px;height:22px;border-radius:var(--r-4);border:1px solid var(--bdr);
+  background:color-mix(in srgb, var(--ink) 6%, transparent);cursor:pointer;font-size:var(--fs-9);display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;color:var(--mut);-webkit-tap-highlight-color:transparent;
+  transition:background .1s,color .1s}
+.tb-merge:active{background:color-mix(in srgb, var(--ink) 18%, transparent);color:var(--ink)}
+/* Merge layer row (layer 3) */
+#tb-lrow3{border-top:1px solid var(--bdr);margin-top:2px;padding-top:6px}
+
+/* ── EXPORT MENU ── */
+#expmenu{position:fixed;top:50px;right:44px;z-index:300;background:var(--pan);border:1px solid var(--bdr);
+  border-radius:var(--r-9);padding:6px 5px;box-shadow:0 3px 14px rgba(0,0,0,.1);display:none;flex-direction:column;
+  gap:2px;min-width:130px;backdrop-filter:blur(12px);transform-origin:top right}
+#expmenu.vis{display:flex}
+body.rside #expmenu{right:auto;left:44px;transform-origin:top left}
+.emb{padding:8px 12px;border-radius:var(--r-5);border:none;background:transparent;color:var(--ink);
+  font-family:'DM Mono',monospace;font-size:var(--fs-85);cursor:pointer;text-align:left;transition:all .1s}
+.emb:hover,.emb.hover{background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.emsep{height:1px;background:var(--bdr);margin:2px 0}
+
+/* ── VIEW POPOVER (long-press on view toggle) ── */
+#view-pop{position:fixed;z-index:400;background:var(--pan);border:1px solid var(--bdr);
+  border-radius:var(--r-9);box-shadow:0 4px 16px rgba(0,0,0,.1);padding:6px 5px;
+  display:none;flex-direction:column;gap:2px;min-width:140px;backdrop-filter:blur(12px)}
+#view-pop.open{display:flex}
+.vp-row{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:var(--r-5);
+  cursor:pointer;transition:background .08s;border:none;background:transparent;
+  color:var(--ink);font-family:'DM Mono',monospace;font-size:var(--fs-85);text-align:left;width:100%}
+.vp-row:hover,.vp-row.hover{background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.vp-row.on{background:color-mix(in srgb, var(--ink) 10%, transparent)}
+.vp-dot{width:6px;height:6px;border-radius:50%;background:var(--mut);flex-shrink:0;transition:background .1s}
+.vp-row.on .vp-dot{background:var(--ink)}
+.vp-sep{height:1px;background:var(--bdr);margin:2px 0}
+/* BG swatch row inside view-pop */
+#vp-bg-row{display:flex;align-items:center;gap:5px;padding:4px 8px}
+#vp-bg-row .bgpop-swatch{width:22px;height:22px;border-radius:var(--r-5)}
+#vp-bg-row #vp-bgpick{width:22px;height:22px;border-radius:var(--r-5);border:1px solid var(--bdr);
+  overflow:hidden;position:relative;background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);flex-shrink:0;cursor:pointer}
+#vp-bg-row #vp-bgpick.on{outline:2px solid var(--ink);outline-offset:1px}
+#vp-bg-row #vp-bgpick input{opacity:0;position:absolute;inset:0;width:100%;height:100%;cursor:pointer}
+
+/* ── RULER MODE POPUP ── */
+#ruler-pop{position:fixed;z-index:400;background:var(--pan);border:1px solid var(--bdr);
+  border-radius:var(--r-9);box-shadow:0 4px 16px rgba(0,0,0,.1);padding:6px 5px;
+  display:none;flex-direction:column;gap:2px;min-width:110px;backdrop-filter:blur(12px)}
+#ruler-pop.open{display:flex}
+
+/* ── SCALE PICKER POPUP ── */
+#scale-pop{position:fixed;z-index:450;background:var(--pan);border:1px solid var(--bdr);
+  border-radius:var(--r-9);box-shadow:0 4px 16px rgba(0,0,0,.12);padding:4px;
+  display:none;flex-direction:column;gap:1px;min-width:100px;max-height:320px;overflow-y:auto;
+  backdrop-filter:blur(12px);-webkit-overflow-scrolling:touch}
+#scale-pop.open{display:flex}
+.sp-item{padding:7px 12px;border-radius:var(--r-5);border:none;background:transparent;
+  color:var(--ink);font-family:'DM Mono',monospace;font-size:var(--fs-85);cursor:pointer;
+  text-align:left;transition:background .08s;white-space:nowrap}
+.sp-item:hover,.sp-item.hover{background:color-mix(in srgb, var(--ink) 7%, transparent)}
+.sp-item.active{background:color-mix(in srgb, var(--ink) 12%, transparent);font-weight:bold}
+.sp-hdr{padding:3px 10px;font-size:var(--fs-7);color:var(--mut);letter-spacing:.06em;pointer-events:none}
+
+/* ── PRIMITIVES / REF OBJECTS ── */
+#bprims{position:fixed;z-index:300;top:44px;right:8px;
+  width:36px;height:32px;border-radius:var(--r-7);
+  background:var(--pan);border:1px solid var(--bdr);color:var(--ink);
+  box-shadow:0 2px 8px rgba(0,0,0,.1);backdrop-filter:blur(12px);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  -webkit-tap-highlight-color:transparent;padding:0}
+#bprims svg{display:block}
+#bprims.on{border-color:var(--ink)}
+body.ui-hidden #bprims{display:none}
+body.fps-active #bprims{top:auto;bottom:8px;right:170px}
+body.rside #bprims{right:auto;left:8px}
+body.rside.fps-active #bprims{left:auto;right:170px}
+
+/* Single-line toolbar under topbar */
+#prim-bar{position:fixed;top:46px;left:50%;transform:translateX(-50%);z-index:199;
+  display:none;align-items:center;gap:3px;padding:3px 8px;
+  background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r-8);
+  box-shadow:0 2px 10px rgba(0,0,0,.1);backdrop-filter:blur(12px);
+  max-width:calc(100vw - 24px);overflow-x:auto;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;white-space:nowrap}
+#prim-bar::-webkit-scrollbar{display:none}
+#prim-bar.open{display:flex}
+body.ui-hidden #prim-bar{display:none!important}
+.prim-tb-btn{height:32px;min-width:32px;border-radius:var(--r-6);border:1px solid var(--bdr);
+  background:transparent;color:var(--ink);font-family:'DM Mono',monospace;font-size:var(--fs-65);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:2px;
+  padding:0 7px;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.prim-tb-btn:active{background:color-mix(in srgb, var(--ink) 10%, transparent)}
+.prim-tb-btn.on{background:color-mix(in srgb, var(--ink) 12%, transparent);border-color:var(--ink)}
+.prim-tb-sep{width:1px;height:20px;background:var(--bdr);flex-shrink:0}
+#prim-obj-count{font-size:var(--fs-6);color:var(--mut);font-family:'DM Mono',monospace;
+  padding:0 2px;letter-spacing:.04em;flex-shrink:0}
+
+/* Sub-popup for object list (drops below prim-bar) */
+#prims-pop{position:fixed;z-index:401;background:var(--pan);border:1px solid var(--bdr);
+  border-radius:var(--r-9);box-shadow:0 4px 16px rgba(0,0,0,.1);padding:5px 4px;
+  display:none;flex-direction:column;gap:1px;min-width:150px;max-height:280px;
+  overflow-y:auto;backdrop-filter:blur(12px);scrollbar-width:thin}
+#prims-pop.open{display:flex}
+.prim-row{display:flex;align-items:center;gap:5px;padding:5px 7px;border-radius:var(--r-6);
+  cursor:pointer;transition:background .08s}
+.prim-row:hover,.prim-row.hover{background:color-mix(in srgb, var(--ink) 6%, transparent)}
+.prim-row.on{background:color-mix(in srgb, var(--ink) 10%, transparent)}
+.prim-row.as-plane{border-left:2px solid var(--ink)}
+.prim-swatch{width:10px;height:10px;border-radius:var(--r-3);border:1px solid var(--bdr);flex-shrink:0}
+.prim-eye{width:28px;height:28px;border-radius:var(--r-5);border:none;background:transparent;
+  cursor:pointer;flex-shrink:0;padding:0;font-size:var(--fs-11);color:var(--mut);
+  display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:color .1s}
+.prim-eye.vis{color:var(--ink)}
+.prim-label{font-size:var(--fs-75);color:var(--ink);font-family:'DM Mono',monospace;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prim-del{width:28px;height:28px;border-radius:var(--r-5);border:none;background:transparent;
+  cursor:pointer;flex-shrink:0;padding:0;font-size:var(--fs-12);color:var(--mut);
+  display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+.prim-del:active{color:#b03020}
+
+/* ── PRIMITIVE GIZMO (floating, matches sgizmo exactly) ── */
+#pgizmo{position:fixed;z-index:250;display:none;flex-direction:column;gap:4px;padding:0;
+  min-width:168px;touch-action:none;user-select:none;-webkit-user-select:none}
+#pgizmo.vis{display:flex}
+#pgizmo.gc-hosted{display:none!important}
+#pgizmo .srow{display:flex;gap:3px;padding:4px 8px 0}
+#pgizmo-hint{font-size:var(--fs-55);color:var(--mut);opacity:.65;text-align:center;margin:0 8px 6px}
+#pgizmo-handle{display:flex;align-items:center;justify-content:center;padding:4px 0 2px;
+  cursor:grab;border-bottom:1px solid var(--bdr);margin-bottom:2px;flex-shrink:0}
+#pgizmo-handle:active{cursor:grabbing}
+#pgizmo-pill{width:28px;height:3px;border-radius:var(--r-2);background:var(--bdr)}
+.pg-color-row{display:flex;gap:3px;padding:2px 8px 4px;flex-wrap:wrap;align-items:center}
+.pg-csw{width:22px;height:22px;border-radius:var(--r-4);border:1px solid var(--bdr);
+  cursor:pointer;flex-shrink:0}
+.pg-csw.active{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+
+/* ── STROKE SELECTION GIZMO (floating, appears on select) ── */
+#sgizmo{position:fixed;z-index:250;display:none;flex-direction:column;gap:4px;padding:0;
+  min-width:168px;touch-action:none;user-select:none;-webkit-user-select:none;
+  background:var(--sgizmo-bg);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+#sgizmo.vis{display:flex}
+#sgizmo.gc-hosted{display:none!important}
+#sgizmo .srow{display:flex;gap:3px;padding:4px 8px 0}
+#sgizmo-hint{font-size:var(--fs-55);color:var(--mut);opacity:.65;text-align:center;margin:0 8px 6px}
+#sgizmo-handle{display:flex;align-items:center;justify-content:center;padding:4px 0 2px;
+  cursor:grab;border-bottom:1px solid var(--bdr);margin-bottom:2px;flex-shrink:0}
+#sgizmo-handle:active{cursor:grabbing}
+#sgizmo-pill{width:28px;height:3px;border-radius:var(--r-2);background:var(--bdr)}
+
+/* ── Narrow float card handle — pill fills left, buttons top-right ── */
+.fc-hdr{display:flex;align-items:center;
+  padding:4px 6px 3px;border-bottom:1px solid var(--bdr);cursor:grab;flex-shrink:0;
+  background:color-mix(in srgb, var(--ink) 3%, transparent)}
+.fc-hdr:active{cursor:grabbing}
+.fc-hdr-pill{flex:1;display:flex;align-items:center;justify-content:center}
+.fc-hdr-pill::before{content:'';display:block;width:28px;height:3px;border-radius:var(--r-2);background:var(--bdr)}
+.fc-hdr-btns{display:flex;gap:3px;flex-shrink:0}
+.fc-hdr-btn{width:24px;height:24px;border-radius:var(--r-5);border:1px solid var(--bdr);
+  background:transparent;color:var(--mut);font-size:var(--fs-8);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  -webkit-tap-highlight-color:transparent;letter-spacing:0;font-family:'DM Mono',monospace}
+.fc-hdr-btn:active{background:color-mix(in srgb, var(--ink) 15%, transparent)}
+.fc-hdr-btn.lit{border-color:var(--ink);opacity:.7}
+
+#toast{position:fixed;bottom:72px;left:50%;transform:translateX(-50%) translateY(6px);
+  background:var(--toast-bg);color:var(--toast-fg);font-size:var(--fs-8);letter-spacing:.06em;
+  padding:5px 12px;border-radius:var(--r-20);z-index:500;pointer-events:none;opacity:0;
+  transition:opacity .15s,transform .15s;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+
+
+/* ── NEW SCENE MODAL ── */
+#new-scene-modal{position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:var(--modal-bg);backdrop-filter:blur(3px)}
+#new-scene-modal.vis{display:flex}
+.nsm-box{background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r-12);padding:16px 18px;box-shadow:0 6px 24px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:10px;min-width:200px;max-width:260px}
+.nsm-title{font-size:var(--fs-9);letter-spacing:.08em;color:var(--ink);text-align:center;opacity:.75}
+.nsm-btns{display:flex;flex-direction:column;gap:5px}
+.nsm-btn{height:30px;border-radius:var(--r-7);border:1px solid var(--bdr);background:transparent;color:var(--ink);font-family:'DM Mono',monospace;font-size:var(--fs-8);cursor:pointer;transition:all .1s;letter-spacing:.04em}
+.nsm-btn:hover,.nsm-btn.hover{background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.nsm-btn.primary{background:color-mix(in srgb, var(--ink) 10%, transparent);font-weight:500}
+.nsm-btn.cancel{color:var(--mut)}
+#save-name-modal{position:fixed;inset:0;z-index:601;display:none;align-items:center;justify-content:center;background:var(--modal-bg);backdrop-filter:blur(3px)}
+#save-name-modal.vis{display:flex}
+#export-name-modal{position:fixed;inset:0;z-index:602;display:none;align-items:center;justify-content:center;background:var(--modal-bg);backdrop-filter:blur(3px)}
+#export-name-modal.vis{display:flex}
+.enm-ext{font-size:var(--fs-8);color:var(--mut);letter-spacing:.04em;margin-left:4px}
+/* Recording stop button */
+#rec-stop-btn{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:700;
+  display:none;align-items:center;gap:6px;padding:6px 14px;border-radius:var(--r-20);border:1px solid rgba(176,48,32,.5);
+  background:color-mix(in srgb, var(--ink) 85%, transparent);backdrop-filter:blur(12px);color:#fff;font-family:'DM Mono',monospace;
+  font-size:var(--fs-8);letter-spacing:.06em;cursor:pointer;-webkit-tap-highlight-color:transparent}
+#rec-stop-btn.vis{display:flex}
+#rec-stop-btn .rec-dot{width:8px;height:8px;border-radius:50%;background:#e03040;animation:rec-blink 1s ease-in-out infinite}
+@keyframes rec-blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+body.selecting{cursor:crosshair!important}body.selecting *{cursor:crosshair!important}
+
+/* Narrow bar */
+#narrow-bar{display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;
+  background:var(--pan);border-top:1px solid var(--bdr);backdrop-filter:blur(12px);
+  flex-direction:column;gap:0}
+#narrow-bar.active{display:flex}
+
+/* Hide-tab at top of narrow bar */
+#pb-tab{display:flex;justify-content:center;align-items:center;padding:4px 0 2px;
+  cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+#pb-tab-handle{width:36px;height:4px;border-radius:var(--r-2);background:var(--bdr);transition:background .1s}
+#pb-tab:hover #pb-tab-handle,#pb-tab:active #pb-tab-handle{background:var(--mut)}
+
+/* Collapsed narrow bar — only tab visible */
+#narrow-bar.pb-collapsed #pb-panels,
+#narrow-bar.pb-collapsed #pb-scroll,
+#narrow-bar.pb-collapsed #pb-colors{display:none}
+#narrow-bar.pb-collapsed #pb-tab-handle{width:28px}
+
+/* ── Float card (narrow) ── */
+#pb-float-card{display:none;position:fixed;z-index:250;
+  background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r-12);
+  box-shadow:0 4px 20px rgba(0,0,0,.22);backdrop-filter:blur(14px);
+  flex-direction:column;overflow:hidden;
+  touch-action:none;user-select:none;-webkit-user-select:none;
+  transition:border-radius .15s,box-shadow .15s}
+#pb-float-card.fc-visible{display:flex}
+/* Panels row — HORIZONTAL, side by side */
+#fc-panels{display:flex;flex-direction:row;gap:3px;padding:3px;overflow:hidden;flex:1;min-height:0}
+#fc-panels .pb-panel{flex:1;max-height:none;min-width:0;overflow:hidden}
+/* Resize grip — right edge */
+#fc-resize{position:absolute;top:50%;right:0;transform:translateY(-50%);
+  width:8px;height:32px;cursor:ew-resize;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  -webkit-tap-highlight-color:transparent}
+#fc-resize-dot{width:3px;height:3px;border-radius:50%;background:var(--bdr);opacity:.6}
+/* ── Docked state — bottom only (sits flush above narrow-bar) ── */
+#pb-float-card.fc-docked-bottom{
+  left:0!important;right:0!important;bottom:var(--pb-h,180px)!important;top:auto!important;
+  border-radius:10px 10px 0 0;border-bottom:none;
+  width:auto!important;box-shadow:0 -2px 12px rgba(0,0,0,.18)}
+#pb-float-card.fc-docked-bottom #fc-resize{display:none}
+#pb-float-card.fc-docked-bottom #fc-dock-btn{border-color:var(--ink);opacity:.7}
+/* Snap indicator flash */
+#fc-snap-hint{position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  border:2px solid var(--ink);opacity:0;transition:opacity .1s}
+#fc-snap-hint.show{opacity:.4}
+/* Nav panel resize grip (right edge, only when card is floating/undocked) */
+#pb-panel-nav{position:relative}
+#fc-nav-resize{display:none;position:absolute;top:0;right:0;bottom:0;width:7px;
+  cursor:ew-resize;z-index:2;-webkit-tap-highlight-color:transparent}
+#fc-nav-resize::after{content:'';position:absolute;top:50%;right:1px;transform:translateY(-50%);
+  width:3px;height:20px;border-radius:var(--r-2);background:var(--bdr);opacity:.5}
+#pb-float-card:not(.fc-docked-bottom) #fc-nav-resize{display:block}
+/* FAB to restore hidden card */
+#pb-fab{display:none;position:fixed;z-index:251;
+  width:36px;height:36px;border-radius:50%;
+  background:var(--pan);border:1px solid var(--bdr);
+  box-shadow:0 2px 10px rgba(0,0,0,.18);
+  color:var(--ink);font-size:var(--fs-16);cursor:pointer;
+  align-items:center;justify-content:center;
+  -webkit-tap-highlight-color:transparent;touch-action:none}
+#pb-fab.fab-visible{display:flex}
+
+/* Sidecol-detached FAB — same look, top-right corner (below #bhide) so user
+   recognises the "bring back UI" icon family from the narrow-mode float card. */
+#sc-fab{position:fixed;top:84px;right:8px;z-index:251;
+  width:32px;height:32px;border-radius:50%;
+  background:var(--pan);border:1px solid var(--bdr);
+  box-shadow:0 2px 10px rgba(0,0,0,.18);
+  color:var(--ink);font-size:var(--fs-14);cursor:pointer;
+  align-items:center;justify-content:center;
+  -webkit-tap-highlight-color:transparent;touch-action:none}
+body.rside #sc-fab{right:auto;left:8px}
+/* When UI is hidden, move sc-fab into the left column above LCL:
+   stack reads bottom-up: ≡ (10) → LCL (52) → sc-fab (94) */
+body.ui-hidden #sc-fab{top:auto;right:auto;left:10px;bottom:94px}
+
+/* Panels row — always visible, fills full width, never scrolls */
+#pb-panels{display:flex;gap:4px;align-items:stretch;padding:5px 6px 4px;flex-shrink:0}
+.pb-panel{border:1px solid var(--bdr);border-radius:var(--r-9);background:color-mix(in srgb, var(--ink) 3%, transparent);
+  display:flex;flex-direction:column;overflow:hidden;flex:1;min-width:0;max-height:45vh}
+
+/* Scrollable tools area — cycbar only */
+#pb-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
+  scrollbar-width:none;flex-shrink:0;padding:3px 6px 3px}
+#pb-scroll::-webkit-scrollbar{display:none}
+#pb-colors::-webkit-scrollbar{display:none}
+
+/* Panel header strip */
+.pb-panel-hdr{display:flex;gap:3px;padding:3px 4px;border-bottom:1px solid var(--bdr);
+  background:color-mix(in srgb, var(--ink) 3%, transparent);flex-shrink:0}
+
+/* Cycle+popover buttons */
+.cyc-btn{flex:1;height:38px;border-radius:var(--r-5);border:1px solid var(--bdr);
+  background:color-mix(in srgb, var(--ink) 6%, transparent);color:var(--ink);font-family:'DM Mono',monospace;
+  font-size:var(--fs-65);cursor:pointer;letter-spacing:.04em;position:relative;
+  -webkit-tap-highlight-color:transparent;transition:background .08s;white-space:nowrap}
+.cyc-btn.on{background:color-mix(in srgb, var(--ink) 14%, transparent);border-color:color-mix(in srgb, var(--ink) 30%, transparent)}
+.cyc-btn:active{background:color-mix(in srgb, var(--ink) 20%, transparent)}
+
+/* Popover menu */
+.cyc-pop{position:fixed;z-index:400;background:var(--pan);border:1px solid var(--bdr);
+  border-radius:var(--r-8);box-shadow:0 -4px 16px rgba(0,0,0,.12);padding:4px;
+  display:none;flex-direction:column;gap:2px;min-width:70px;backdrop-filter:blur(12px)}
+.cyc-pop.open{display:flex}
+.cyc-pop-item{padding:7px 12px;border-radius:var(--r-5);border:none;background:transparent;
+  color:var(--ink);font-family:'DM Mono',monospace;font-size:var(--fs-75);cursor:pointer;
+  text-align:left;transition:background .08s;-webkit-tap-highlight-color:transparent}
+.cyc-pop-item:active,.cyc-pop-item.cur{background:color-mix(in srgb, var(--ink) 10%, transparent)}
+
+/* Layer rows in narrow panel — stretch to fill */
+.pb-lrow{display:flex;align-items:center;gap:3px;padding:0 5px;
+  flex:1;border-bottom:1px solid color-mix(in srgb, var(--ink) 6%, transparent)}
+.pb-lrow:last-child{border-bottom:none}
+
+/* Bottom toolbar */
+#pb-toolbar{display:flex;gap:3px;justify-content:center;align-items:center;flex-wrap:wrap}
+#pb-cycbar{display:flex;gap:3px;padding:0;flex-wrap:nowrap;width:max-content}
+
+/* ── LAYERS TOPBAR POPOVER ── */
+#layers-pop{position:fixed;z-index:400;background:var(--pan);border:1px solid var(--bdr);
+  border-radius:var(--r-9);box-shadow:0 4px 16px rgba(0,0,0,.1);padding:6px 5px;
+  display:none;flex-direction:column;gap:2px;min-width:140px;backdrop-filter:blur(12px)}
+#layers-pop.open{display:flex}
+.tb-lrow{display:flex;align-items:center;gap:5px;padding:5px 7px;border-radius:var(--r-6);cursor:pointer;transition:background .08s}
+.tb-lrow:hover,.tb-lrow.hover{background:color-mix(in srgb, var(--ink) 6%, transparent)}
+.tb-lrow.active{background:color-mix(in srgb, var(--ink) 10%, transparent)}
+.tb-leye{width:22px;height:22px;border-radius:var(--r-4);border:none;background:transparent;
+  cursor:pointer;font-size:var(--fs-10);display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;color:var(--mut);-webkit-tap-highlight-color:transparent;transition:color .1s}
+.tb-leye.vis{color:var(--ink)}
+/* ── BG COLOR POPOVER ── */
+#bgpop{position:fixed;z-index:400;background:var(--pan);border:1px solid var(--bdr);
+  border-radius:var(--r-9);box-shadow:0 4px 16px rgba(0,0,0,.1);padding:5px 6px;
+  display:none;flex-direction:row;gap:5px;align-items:center;backdrop-filter:blur(12px)}
+#bgpop.open{display:flex}
+.bgpop-swatch{width:22px;height:22px;border-radius:var(--r-5);cursor:pointer;border:1.5px solid transparent;
+  box-shadow:0 1px 3px rgba(0,0,0,.18);transition:transform .1s,border-color .1s;flex-shrink:0}
+.bgpop-swatch:hover,.bgpop-swatch.hover{transform:scale(1.1)}.bgpop-swatch.on{border-color:var(--ink)}
+#bgpop-pick{width:22px;height:22px;border-radius:var(--r-5);border:1px solid var(--bdr);cursor:pointer;
+  overflow:hidden;position:relative;background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);flex-shrink:0}
+#bgpop-pick.on{outline:2px solid var(--ink);outline-offset:2px}
+#bgpop-pick input{opacity:0;position:absolute;inset:0;width:100%;height:100%;cursor:pointer}
+#bpanel{display:flex;flex-direction:column;gap:0;padding:6px 8px}
+.bprev-row{display:flex;align-items:center;gap:4px;padding:3px 0}
+.bprev-row+.bprev-row{border-top:1px solid var(--bdr)}
+.bprev-lbl{font-size:var(--fs-6);text-transform:uppercase;letter-spacing:.08em;color:var(--mut);width:18px;flex-shrink:0}
+.bprev-btn{width:32px;height:32px;border-radius:var(--r-7);border:1.5px solid transparent;
+  background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;-webkit-tap-highlight-color:transparent;transition:border-color .1s,background .1s}
+.bprev-btn.cur{border-color:var(--ink);background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.bprev-btn:active{background:color-mix(in srgb, var(--ink) 14%, transparent)}
+.bprev-more{flex:none;width:28px;height:28px;border-radius:var(--r-5);border:1px solid var(--bdr);
+  background:color-mix(in srgb, var(--ink) 5%, transparent);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--mut);font-size:var(--fs-10);-webkit-tap-highlight-color:transparent;transition:background .1s;margin-left:2px}
+.bprev-more:active{background:color-mix(in srgb, var(--ink) 15%, transparent)}
+
+/* ── SIZE + OPACITY PICKERS (shared popover style) ── */
+.brush-pop{position:fixed;z-index:500;background:var(--pan);border:1px solid var(--bdr);
+  border-radius:var(--r-10);box-shadow:0 4px 18px rgba(0,0,0,.12);padding:8px;
+  display:none;flex-direction:column;gap:7px;width:150px;backdrop-filter:blur(12px)}
+.brush-pop.open{display:flex}
+.brush-preview-row{display:flex;align-items:center;justify-content:center;padding:2px 0}
+.brush-slider-row{padding:0 2px}
+.brush-slider-row input[type=range]{-webkit-appearance:none;width:100%;height:4px;background:var(--bdr);border-radius:var(--r-2);outline:none;cursor:pointer}
+.brush-slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--ink);border:2px solid var(--thumb-bdr);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.brush-slider-row input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:var(--ink);border:2px solid var(--thumb-bdr)}
+
+/* Narrow horizontal sliders — larger thumb for touch */
+#pb-colors input[type=range]{-webkit-appearance:none;height:4px;border-radius:var(--r-2);outline:none;cursor:pointer}
+#pb-colors input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--ink);border:2px solid var(--thumb-bdr);box-shadow:0 1px 4px rgba(0,0,0,.2)}
+#pb-colors input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:var(--ink);border:2px solid var(--thumb-bdr)}
+
+@media(max-aspect-ratio:2/3){
+  #topbar{top:6px;padding:3px 6px;gap:2px;max-width:calc(100vw - 80px)}
+  #sidecol{display:none}
+  #sbar{bottom:6px}
+  #bhide{top:6px}
+  #bprims{top:42px}
+  #prim-bar{top:44px;max-width:calc(100vw - 16px)}
+}

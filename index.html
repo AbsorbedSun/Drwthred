@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<!--
+  DrwThred — fork personal para uso local.
+  Basado en "sketchbook-v8" de notebysebas:
+  https://github.com/notebysebas/sketchbook-v8
+  Todo el crédito del diseño y motor original es de su autor; este fork
+  solo reorganiza/reestiliza la interfaz para uso propio.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>DrwThred</title>
+<meta name="theme-color" content="#f4f1ea">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DrwThred">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script>
+  if('serviceWorker' in navigator){
+    window.addEventListener('load',function(){
+      navigator.serviceWorker.register('./sw.js').catch(function(e){console.warn('SW:',e);});
+    });
+  }
+</script>
+</head>
+<body>
+<div id="cc"></div>
+<div id="new-scene-modal">
+  <div class="nsm-box">
+    <div class="nsm-title">START NEW SCENE</div>
+    <div class="nsm-btns">
+      <button class="nsm-btn primary" id="nsm-save">Save &amp; New</button>
+      <button class="nsm-btn" id="nsm-discard">Discard &amp; New</button>
+      <button class="nsm-btn cancel" id="nsm-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+<div id="save-name-modal">
+  <div class="nsm-box">
+    <div class="nsm-title">SAVE AS</div>
+    <input id="save-name-input" type="text" value="drwthred" autocomplete="off" spellcheck="false" style="height:28px;border-radius:7px;border:1px solid var(--bdr);background:transparent;color:var(--ink);font-family:'DM Mono',monospace;font-size:9px;padding:0 8px;outline:none;letter-spacing:.04em">
+    <div class="nsm-btns">
+      <button class="nsm-btn primary" id="snm-save">Save</button>
+      <button class="nsm-btn cancel" id="snm-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+<div id="export-name-modal">
+  <div class="nsm-box">
+    <div class="nsm-title">EXPORT AS</div>
+    <div style="display:flex;align-items:center">
+      <input id="export-name-input" type="text" value="drwthred" autocomplete="off" spellcheck="false" style="flex:1;height:28px;border-radius:7px;border:1px solid var(--bdr);background:transparent;color:var(--ink);font-family:'DM Mono',monospace;font-size:9px;padding:0 8px;outline:none;letter-spacing:.04em">
+      <span class="enm-ext" id="export-name-ext">.glb</span>
+    </div>
+    <div class="nsm-btns">
+      <button class="nsm-btn primary" id="enm-export">Export</button>
+      <button class="nsm-btn cancel" id="enm-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+<button id="rec-stop-btn"><span class="rec-dot"></span>STOP REC</button>
+<div id="toast"></div>
+
+<!-- FPS NAV OVERLAY — touch-gesture hint ring (JS-injected) + crosshair + exit.
+     No joystick widgets: 2-finger drag looks around, 3-finger drag walks
+     (see input-gestures.js / navigation-controls.js). -->
+<div id="fps-overlay"></div>
+<div id="fps-crosshair">
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.2">
+    <line x1="10" y1="4" x2="10" y2="8"/><line x1="10" y1="12" x2="10" y2="16"/>
+    <line x1="4" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="16" y2="10"/>
+    <circle cx="10" cy="10" r="1" fill="currentColor" stroke="none"/>
+  </svg>
+</div>
+<div id="fps-plane-ctrl">
+  <button id="fps-plane-toggle" class="on">⬡ SCENE</button>
+  <div id="fps-plane-dist-wrap">
+    <div class="fps-slider-row">
+      <span class="fps-slider-label">DIST</span>
+      <input id="fps-plane-dist" type="range" class="fps-slider" min="1" max="20" step="0.5" value="5">
+    </div>
+    <div class="fps-slider-row">
+      <span class="fps-slider-label">SIZE</span>
+      <input id="fps-plane-size" type="range" class="fps-slider" min="1" max="20" step="0.5" value="6">
+    </div>
+  </div>
+  <button id="fps-exit">ESC FPS</button>
+</div>
+
+<!-- Align-plane-to-view distance slider (temporary, shown after ⌖VIEW tap) -->
+<div id="gview-dist-wrap">
+  <span class="fps-slider-label">DIST</span>
+  <input id="gview-dist" type="range" class="fps-slider" min="1" max="20" step="0.5" value="5">
+  <button id="gview-dist-close" class="btn btn-sm" style="width:28px;height:28px;border-radius:50%;font-size:11px;line-height:1;flex-shrink:0">✕</button>
+</div>
+
+<!-- TOPBAR: consolidated — New, Pages, Views, View toggle, Layers, Undo/Redo/Clear, Look, File -->
+<div id="topbar" class="card">
+  <!-- New File (top-left) -->
+  <button class="btn btn-sm danger" id="bnew" title="New scene">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h5l3 3v7H3z"/><path d="M8 2v3h3"/><path d="M10.5 1.5l.6 1.2 1.2.6-1.2.6-.6 1.2-.6-1.2-1.2-.6 1.2-.6z" stroke-width="1.1"/></svg>
+  </button>
+  <div class="tsep"></div>
+  <!-- Pages + Views -->
+  <button class="btn btn-pill" id="pgbtn" title="Pages" style="font-size:7px;width:auto;padding:0 7px;letter-spacing:.05em">PAGES</button>
+  <button class="btn btn-pill" id="vwbtn" title="Saved Views" style="font-size:7px;width:auto;padding:0 7px;letter-spacing:.05em">VIEWS</button>
+  <div class="tsep"></div>
+  <!-- View toggle: tap=all on/off, arrow opens popover -->
+  <button class="btn btn-sm on" id="bview-toggle" title="View toggles · tap for all on/off">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 7Q3 4 7 4Q11 4 13 7Q11 10 7 10Q3 10 1 7Z"/><circle cx="7" cy="7" r="2"/><path d="M3 2L5 4M11 2L9 4" stroke-width="1.1" opacity=".4"/></svg>
+  </button>
+  <button class="btn btn-sm" id="bview-arrow" title="View options" style="width:30px;height:30px;padding:0;margin-left:-3px">
+    <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3L4 5.5L6.5 3"/></svg>
+  </button>
+  <!-- Layers -->
+  <button class="btn btn-pill" id="blayers" title="Layers" style="font-size:7px;width:auto;padding:0 7px;letter-spacing:.05em">LAYERS</button>
+  <div class="tsep"></div>
+  <!-- Undo/redo/clear -->
+  <button class="btn btn-sm" id="bundo" title="Undo (Ctrl+Z)" data-k="⌘Z">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7Q3 3 7 3Q11 3 11 7Q11 11 7 11"/><polyline points="3,4 3,7 6,7"/></svg>
+  </button>
+  <button class="btn btn-sm" id="bredo" title="Redo">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 7Q11 3 7 3Q3 3 3 7Q3 11 7 11"/><polyline points="11,4 11,7 8,7"/></svg>
+  </button>
+  <button class="btn btn-sm" id="bclear" title="Clear all">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,4 12,4"/><path d="M5 4L5 2L9 2L9 4"/><path d="M3 4L4 13L10 13L11 4"/></svg>
+  </button>
+  <div class="tsep"></div>
+  <!-- Look around mode: 1-finger orbit, 2-finger pan/zoom, no drawing -->
+  <button class="btn btn-sm" id="blook" title="Look around · 1F orbit · 2F pan/zoom">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5V2.5a1 1 0 0 1 2 0V5"/><path d="M9 5V3.5a1 1 0 0 1 2 0V7"/><path d="M5 5V2a1 1 0 0 1 2 0v3"/><path d="M5 5V4a1 1 0 0 0-2 0v4a4 4 0 0 0 4 4h1a4 4 0 0 0 4-4V5"/></svg>
+  </button>
+  <button class="btn btn-sm" id="bsruler" title="Ruler overlay (L)">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor"
+         stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="1" y="5" width="12" height="4" rx="1"/>
+      <line x1="4" y1="5" x2="4" y2="7"/>
+      <line x1="7" y1="5" x2="7" y2="8.5"/>
+      <line x1="10" y1="5" x2="10" y2="7"/>
+    </svg>
+  </button>
+  <button class="btn btn-sm" id="bruler-arrow" title="Ruler mode" style="width:30px;height:30px;padding:0;margin-left:-3px">
+    <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3L4 5.5L6.5 3"/></svg>
+  </button>
+  <button class="btn btn-pill" id="bstylus" title="Stylus-only draw: finger=navigate, pen=draw" style="font-size:6.5px;width:auto;padding:0 6px;letter-spacing:.04em">FINGER</button>
+  <div class="tsep"></div>
+  <!-- File menu: save, load, export, png, record, scale -->
+  <button class="btn btn-sm" id="bfile" title="File · save, load, export">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2L10 2L12 4L12 12L2 12Z"/><rect x="4" y="2" width="6" height="4" rx=".5"/><rect x="4" y="8" width="6" height="4" rx=".5"/></svg>
+  </button>
+</div>
+
+<!-- View popover — opened by long-press on #bview-toggle -->
+<div id="view-pop">
+  <button class="vp-row on" id="bsurf" title="Surface on/off"><span class="vp-dot"></span>Surface</button>
+  <button class="vp-row on" id="bgrid" title="Grid on/off"><span class="vp-dot"></span>Grid</button>
+  <button class="vp-row on" id="baxis" title="Axis lines on/off"><span class="vp-dot"></span>Axis</button>
+  <button class="vp-row on" id="bdepth" title="Depth cues on/off"><span class="vp-dot"></span>Depth</button>
+  <div class="vp-sep"></div>
+  <button class="vp-row" id="bdepth-op" title="Cycle depth opacity" style="font-size:8px">Depth: 50%</button>
+  <button class="vp-row on" id="bsurfgrid" title="Cycle surface grid" style="font-size:8px">Grid: DOT</button>
+  <button class="vp-row" id="bdelloft" title="Delete loft surface" style="display:none;color:#b03020">Delete Loft</button>
+  <div class="vp-sep"></div>
+  <button class="vp-row" id="bpersp" title="Toggle perspective/ortho">PERSP</button>
+  <button class="vp-row" id="bgestswap" title="Swap 2-finger gesture">2F=ORB</button>
+  <div class="vp-sep"></div>
+  <div id="vp-bg-row">
+    <span style="font-size:7.5px;color:var(--mut);letter-spacing:.06em;flex-shrink:0">BG</span>
+    <div class="bgpop-swatch on" id="vp-bg-beige" title="Paper" style="background:#f4f1ea"></div>
+    <div class="bgpop-swatch" id="vp-bg-white" title="White" style="background:#ffffff;border-color:var(--bdr)"></div>
+    <div class="bgpop-swatch" id="vp-bg-black" title="Black" style="background:#2a2a2e"></div>
+    <div id="vp-bgpick" title="Custom color"><input type="color" id="vp-bg-custom" value="#f4f1ea"></div>
+  </div>
+  <div id="vp-theme-row" style="display:flex;align-items:center;gap:4px;padding:2px 8px 4px">
+    <span style="font-size:7.5px;color:var(--mut);letter-spacing:.06em;flex-shrink:0">UI</span>
+    <button class="btn-pill btn theme-btn on" data-theme="default" title="Default theme" style="font-size:6px;height:22px;padding:0 5px">DEF</button>
+    <button class="btn-pill btn theme-btn" data-theme="dark" title="Dark theme" style="font-size:6px;height:22px;padding:0 5px">DRK</button>
+    <button class="btn-pill btn theme-btn" data-theme="light" title="Light theme" style="font-size:6px;height:22px;padding:0 5px">LGT</button>
+    <button class="btn-pill btn theme-btn" data-theme="eink" title="E-ink theme" style="font-size:6px;height:22px;padding:0 5px">INK</button>
+  </div>
+</div>
+
+<!-- Ruler mode popover — opened by #bruler-arrow -->
+<div id="ruler-pop">
+  <button class="vp-row on" id="ruler-mode-screen" title="Screen-space ruler"><span class="vp-dot"></span>Screen</button>
+  <button class="vp-row" id="ruler-mode-world" title="World-space ruler (on plane)"><span class="vp-dot"></span>On Plane</button>
+  <div class="vp-sep"></div>
+  <button class="vp-row" id="bprecision" title="Show distance/angle during transforms"><span class="vp-dot"></span>Precision</button>
+  <div class="vp-sep"></div>
+  <button class="vp-row" id="bscaleoverlay" title="Show 3D scale cage on drawing plane"><span class="vp-dot"></span>Scale Cage</button>
+  <button class="vp-row" id="bscaleselect" title="Select scale" style="font-size:8px;padding-left:20px">OFF</button>
+</div>
+
+<!-- Scale picker popup — opened from view-pop or long-press on em-scale -->
+<div id="scale-pop">
+</div>
+
+<!-- Hidden original buttons that JS still references (kept in DOM but hidden) -->
+<div style="display:none">
+  <button id="bpan"></button>
+  <button id="borbit"></button>
+  <button id="bbg"></button>
+  <button id="bsave"></button>
+  <button id="bload"></button>
+  <button id="bexp"></button>
+  <button id="bpng"></button>
+  <button id="bscale"></button>
+</div>
+
+<!-- Hide UI button — always top-right, always visible -->
+<button class="btn btn-sm card" id="bhide" title="Hide/show UI (H)">
+  <svg id="bhide-eye" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 7Q3 4 7 4Q11 4 13 7Q11 10 7 10Q3 10 1 7Z"/><circle cx="7" cy="7" r="2"/></svg>
+</button>
+<!-- Views trigger — only visible when UI is hidden, for screen recording -->
+<button class="btn btn-sm card" id="bviews-hidden" title="Saved Views" style="opacity:.35">
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="5" height="4" rx="1"/><rect x="8" y="3" width="5" height="4" rx="1"/><rect x="1" y="9" width="5" height="4" rx="1"/><rect x="8" y="9" width="5" height="4" rx="1"/></svg>
+</button>
+
+<!-- Layers popover — triggered from topbar LAYERS button -->
+<div id="layers-pop">
+  <div class="tb-lrow active" id="tb-lrow0" data-layer="0">
+    <button class="tb-leye vis" id="tb-leye0">◉</button>
+    <span class="ldot" style="background:#b03020;width:7px;height:7px;border-radius:50%;flex-shrink:0"></span>
+    <span style="font-size:8px;color:var(--ink);font-family:'DM Mono',monospace;flex:1">BG</span>
+    <button class="tb-merge" id="tb-merge0" title="Merge layer to Merge layer">⊕</button>
+  </div>
+  <div class="tb-lrow" id="tb-lrow1" data-layer="1">
+    <button class="tb-leye vis" id="tb-leye1">◉</button>
+    <span class="ldot" style="background:var(--ink);width:7px;height:7px;border-radius:50%;flex-shrink:0"></span>
+    <span style="font-size:8px;color:var(--ink);font-family:'DM Mono',monospace;flex:1">Sketch</span>
+    <button class="tb-merge" id="tb-merge1" title="Merge layer to Merge layer">⊕</button>
+  </div>
+  <div class="tb-lrow" id="tb-lrow2" data-layer="2">
+    <button class="tb-leye vis" id="tb-leye2">◉</button>
+    <span class="ldot" style="background:#1a9940;width:7px;height:7px;border-radius:50%;flex-shrink:0"></span>
+    <span style="font-size:8px;color:var(--ink);font-family:'DM Mono',monospace;flex:1">Notes</span>
+    <button class="tb-merge" id="tb-merge2" title="Merge layer to Merge layer">⊕</button>
+  </div>
+  <div class="tb-lrow" id="tb-lrow3" data-layer="3" style="display:none">
+    <button class="tb-leye vis" id="tb-leye3">◉</button>
+    <span class="ldot" style="background:#8b5cf6;width:7px;height:7px;border-radius:50%;flex-shrink:0"></span>
+    <span style="font-size:8px;color:var(--ink);font-family:'DM Mono',monospace;flex:1">Merged</span>
+  </div>
+  <div class="tb-lrow" id="tb-lrow4" data-layer="4" style="display:none">
+    <button class="tb-leye vis" id="tb-leye4">◉</button>
+    <span class="ldot" style="background:#c084fc;width:7px;height:7px;border-radius:50%;flex-shrink:0"></span>
+    <span style="font-size:8px;color:var(--ink);font-family:'DM Mono',monospace;flex:1">Ref</span>
+  </div>
+</div>
+
+<!-- Background color popover -->
+<div id="bgpop">
+  <div class="bgpop-swatch on" id="bgpop-beige" title="Paper" style="background:#f4f1ea"></div>
+  <div class="bgpop-swatch" id="bgpop-white" title="White" style="background:#ffffff;border-color:var(--bdr)"></div>
+  <div class="bgpop-swatch" id="bgpop-black" title="Black" style="background:#2a2a2e"></div>
+  <div id="bgpop-pick" title="Custom color"><input type="color" id="bgpop-custom" value="#f4f1ea"></div>
+  <div style="width:1px;height:18px;background:var(--bdr);margin:0 1px;flex-shrink:0"></div>
+  <button class="btn-pill btn theme-btn on" data-theme="default" title="Default theme" style="font-size:6px;height:22px;padding:0 5px">DEF</button>
+  <button class="btn-pill btn theme-btn" data-theme="dark" title="Dark theme" style="font-size:6px;height:22px;padding:0 5px">DRK</button>
+  <button class="btn-pill btn theme-btn" data-theme="light" title="Light theme" style="font-size:6px;height:22px;padding:0 5px">LGT</button>
+  <button class="btn-pill btn theme-btn" data-theme="eink" title="E-ink theme" style="font-size:6px;height:22px;padding:0 5px">INK</button>
+</div>
+
+<!-- Size picker popover — custom value -->
+<div id="sz-pop" class="brush-pop">
+  <div class="brush-preview-row">
+    <canvas id="sz-prev-pop" width="120" height="32" style="border-radius:4px;display:block;width:100%"></canvas>
+  </div>
+  <div class="brush-slider-row">
+    <input type="range" id="sz-sld" min="1" max="20" value="1">
+  </div>
+</div>
+
+<!-- Opacity picker popover — custom value -->
+<div id="op-pop" class="brush-pop">
+  <div class="brush-preview-row">
+    <canvas id="op-prev-pop" width="120" height="32" style="border-radius:4px;display:block;width:100%"></canvas>
+  </div>
+  <div class="brush-slider-row">
+    <input type="range" id="op-sld" min="10" max="100" value="95">
+  </div>
+</div>
+
+<!-- SIDE COLUMN — two unified groups (bottom: gizmo+nav, top: tools+brush+colors) -->
+<div id="sidecol">
+
+  <!-- Bottom group: gizmo + navcube -->
+  <div class="sc-group" id="sg-bottom">
+  <div class="sc-grab" data-group="bottom" title="Drag to detach · tap to collapse">
+    <span class="sc-title">CONTROL</span>
+    <div class="sc-grab-spacer"></div>
+    <button id="sg-swap" class="sc-swap" title="Swap nav ↔ gizmo">⇅</button>
+    <button class="sc-dock" data-group="bottom" title="Dock back">⊞</button>
+    <button class="sc-close" data-group="bottom" title="Hide">×</button>
+  </div>
+  <div class="scale-dot corner-br" data-scaletarget="sg-bottom" title="Drag to scale"></div>
+
+  <!-- Plane gizmo (bottom of sidecol) -->
+  <div id="ghud" class="card" style="padding:0">
+    <div class="pb-panel-hdr">
+      <button class="cyc-btn on" id="sb-cyc-mode">All</button>
+      <button class="cyc-btn on" id="sb-cyc-plane">Front</button>
+      <button class="cyc-btn on" id="sb-cyc-axis">All</button>
+      <button class="cyc-btn on" id="sb-cyc-surf">Pln</button>
+    </div>
+    <div style="padding:6px 8px;display:flex;flex-direction:column;gap:3px">
+      <!-- Hidden data-plane / data-ga / data-gm buttons kept for JS sync -->
+      <div style="display:none" id="plane-row">
+        <button data-plane="xy"></button>
+        <button class="on" data-plane="xz"></button>
+        <button data-plane="yz"></button>
+      </div>
+      <div style="display:none">
+        <button class="on" id="ga-all" data-ga="all"></button>
+        <button id="ga-x" data-ga="x"></button>
+        <button id="ga-y" data-ga="y"></button>
+        <button id="ga-z" data-ga="z"></button>
+      </div>
+      <div style="display:none">
+        <button class="on mode" id="gm-move" data-gm="move"></button>
+        <button class="mode" id="gm-rotate" data-gm="rotate"></button>
+        <button class="mode" id="gm-scale" data-gm="scale"></button>
+      </div>
+      <div style="position:relative">
+        <canvas id="gc" width="150" height="130"></canvas>
+        <div id="ghud-sel-prec" style="display:none;position:absolute;bottom:2px;left:4px;font-size:7px;color:var(--ink);font-family:'DM Mono',monospace;letter-spacing:.03em;pointer-events:none;text-shadow:0 0 4px var(--pan),0 0 4px var(--pan)"></div>
+      </div>
+      <div id="ghud-bottom">
+        <button id="greset" class="btn btn-pill" style="font-size:6.5px">RESET</button>
+        <button id="gsnap" class="btn btn-pill on" style="font-size:6.5px">⊙45°</button>
+        <button id="gface" class="btn btn-pill" style="font-size:6.5px" title="Align camera to face the drawing plane">⌖FACE</button>
+        <button id="gview" class="btn btn-pill" style="font-size:6.5px" title="Align plane to face camera">⌖VIEW</button>
+        <button id="glocal" class="btn btn-pill" style="font-size:6.5px" title="Toggle 3D local gizmo overlay">⊕LCL</button>
+        <button id="gc-axmode" class="btn btn-pill on" style="font-size:6.5px" title="Toggle local/world axes" onclick="window._gcToggleAxisMode&&window._gcToggleAxisMode()">AXS</button>
+        <span id="ghint">move · rotate · scale</span>
+      </div>
+      <!-- Selection controls: replaces ghud-bottom when stroke/prim selected -->
+      <div id="ghud-sel" style="display:none;padding:4px 6px 2px;flex-direction:column;gap:3px">
+        <div style="display:flex;gap:3px">
+          <button class="btn btn-pill gc-sel-btn" data-selact="all" style="flex:1;min-width:0;padding:0 3px">All</button>
+          <button class="btn btn-pill gc-sel-btn" data-selact="move" style="flex:1;min-width:0;padding:0 3px">Mv</button>
+          <button class="btn btn-pill gc-sel-btn" data-selact="rotate" style="flex:1;min-width:0;padding:0 3px">Rot</button>
+          <button class="btn btn-pill gc-sel-btn" data-selact="scale" style="flex:1;min-width:0;padding:0 3px">Sc</button>
+        </div>
+        <div style="display:flex;gap:3px">
+          <button class="btn btn-pill gc-sel-btn" data-selact="dup" style="flex:1;min-width:0;padding:0 3px">Dup</button>
+          <button class="btn btn-pill gc-sel-btn" data-selact="loft" style="flex:1;min-width:0;padding:0 3px">⟁Lft</button>
+          <button class="btn btn-pill gc-sel-btn" data-selact="loft-solid" style="flex:1;min-width:0;padding:0 3px;display:none">~Sld</button>
+          <button class="btn btn-pill gc-sel-btn danger" data-selact="del" style="flex:1;min-width:0;padding:0 3px">Del</button>
+          <button class="btn btn-pill gc-sel-btn" data-selact="close" style="flex:1;min-width:0;padding:0 3px">✕</button>
+        </div>
+        <div id="ghud-sel-prim" style="display:none;flex-direction:column;gap:2px">
+          <div style="display:flex;gap:2px;flex-wrap:wrap;align-items:center">
+            <div class="pg-csw gc-pc" data-pc="#ffffff" style="background:#ffffff"></div>
+            <div class="pg-csw gc-pc" data-pc="#b0b0b0" style="background:#b0b0b0"></div>
+            <div class="pg-csw gc-pc" data-pc="#e05040" style="background:#e05040"></div>
+            <div class="pg-csw gc-pc" data-pc="#4a90d9" style="background:#4a90d9"></div>
+            <div class="pg-csw gc-pc" data-pc="#50a050" style="background:#50a050"></div>
+            <div class="pg-csw gc-pc" data-pc="#e0c040" style="background:#e0c040"></div>
+            <input type="color" id="gc-pcpick" value="#ffffff" style="width:18px;height:18px;border:1px solid var(--bdr);border-radius:3px;padding:0;cursor:pointer;background:transparent">
+          </div>
+          <div style="display:flex;gap:3px;align-items:center">
+            <span style="font-size:5.5px;color:var(--mut);font-family:'DM Mono',monospace">OP</span>
+            <input type="range" id="gc-popacity" min="5" max="100" value="100" style="flex:1;height:14px;accent-color:var(--ink);cursor:pointer">
+            <span id="gc-pop-val" style="font-size:5.5px;color:var(--mut);font-family:'DM Mono',monospace;width:16px;text-align:right">100</span>
+            <button class="btn btn-pill gc-sel-btn" data-selact="useplane" style="font-size:5.5px;min-height:22px;padding:1px 4px">⬡Plane</button>
+          </div>
+        </div>
+        <div id="ghud-sel-hint" style="font-size:5.5px;color:var(--mut);opacity:.6;text-align:center;font-family:'DM Mono',monospace"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nav slot: NavCube, hidden while in FPS mode -->
+  <div class="card" id="nav-card" style="padding:0;display:flex;flex-direction:column">
+    <div class="pb-panel-hdr">
+      <button id="nav-toggle" class="cyc-btn" style="letter-spacing:.03em">⬡ NAV</button>
+      <button id="nav-persp" class="cyc-btn" style="font-size:6.5px;letter-spacing:.04em" title="Toggle perspective/ortho">PERSP</button>
+      <button id="nav-zoom-out" class="cyc-btn" style="flex:none;width:22px;font-size:13px;line-height:1" title="Zoom out">−</button>
+      <button id="nav-zoom-in" class="cyc-btn" style="flex:none;width:22px;font-size:13px;line-height:1" title="Zoom in">+</button>
+      <button id="nav-reset" class="cyc-btn" style="flex:none;width:24px" title="Reset view">⌂</button>
+    </div>
+    <div id="nav-slot" style="position:relative;padding:4px">
+      <canvas id="navcube" width="168" height="120" style="display:block;border-radius:6px;cursor:grab;width:168px;height:120px" title="Drag to orbit · tap face to snap · double-tap for ortho"></canvas>
+    </div>
+  </div>
+
+  </div><!-- /sg-bottom -->
+
+  <!-- Top group: tools + brush + colors -->
+  <div class="sc-group" id="sg-top">
+  <div class="sc-grab" data-group="top" title="Drag to detach">
+    <span class="sc-title">TOOLS</span>
+    <div class="sc-grab-spacer"></div>
+    <button class="sc-dock" data-group="top" title="Dock back">⊞</button>
+    <button class="sc-close" data-group="top" title="Hide">×</button>
+  </div>
+  <div class="scale-dot corner-br" data-scaletarget="sg-top" title="Drag to scale"></div>
+
+  <!-- Tool strip: drawing tools (moved from topbar) -->
+  <div id="sidetools" class="card">
+    <button class="btn btn-md on mode" id="sdraw" data-k="D" title="Draw (D)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12L9.5 4.5Q11 3 12 4Q13 5 11.5 6.5L4 12Z"/></svg>
+    </button>
+    <button class="btn btn-md mode" id="serase" data-k="E" title="Erase (E)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11L8 4L11 7L6 12Z"/><line x1="1" y1="12" x2="13" y2="12"/></svg>
+    </button>
+    <button class="btn btn-md mode" id="sselect" data-k="Q" title="Select (Q)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3L3 10L6 8L8 12L10 11L8 7L11 7Z"/></svg>
+    </button>
+    <div style="width:1px;height:16px;background:var(--bdr);margin:0 2px;flex-shrink:0"></div>
+    <button class="btn btn-md" id="sflat" data-k="F" title="Flat brush (F)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="10" height="4" rx="1"/><line x1="7" y1="9" x2="7" y2="12"/></svg>
+    </button>
+    <button class="btn btn-md" id="ssmooth" data-k="S" title="Smoothing (S)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 7Q3 4 5 7Q7 10 9 7Q11 4 13 7"/></svg>
+    </button>
+    <button class="btn btn-md on" id="svel" data-k="W" title="Velocity taper (W)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 9Q3 9 5 7Q7 5 9 5Q11 5 13 7" stroke-width="3" opacity=".35"/><path d="M1 9Q3 9 5 7Q7 5 9 5Q11 5 13 7" stroke-width="1"/></svg>
+    </button>
+    <div style="width:1px;height:16px;background:var(--bdr);margin:0 2px;flex-shrink:0"></div>
+    <button class="btn btn-md" id="s-undo" title="Undo (Ctrl+Z)">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7Q3 3 7 3Q11 3 11 7Q11 11 7 11"/><polyline points="3,4 3,7 6,7"/></svg>
+    </button>
+    <button class="btn btn-md" id="s-redo" title="Redo">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 7Q11 3 7 3Q3 3 3 7Q3 11 7 11"/><polyline points="11,4 11,7 8,7"/></svg>
+    </button>
+  </div>
+
+  <!-- Brush preview — 3 size + 3 opacity presets always visible -->
+  <div id="bpanel" class="card">
+    <div class="bprev-row">
+      <span class="bprev-lbl">SZ</span>
+      <button class="bprev-btn cur" data-sz="1" style="flex-direction:column;gap:1px"><canvas id="sz-p1" width="24" height="18"></canvas><span style="font-size:5px;color:var(--mut);line-height:1">1</span></button>
+      <button class="bprev-btn" data-sz="3" style="flex-direction:column;gap:1px"><canvas id="sz-p3" width="24" height="18"></canvas><span style="font-size:5px;color:var(--mut);line-height:1">3</span></button>
+      <button class="bprev-btn" data-sz="6" style="flex-direction:column;gap:1px"><canvas id="sz-p6" width="24" height="18"></canvas><span style="font-size:5px;color:var(--mut);line-height:1">6</span></button>
+      <button class="bprev-more" id="sz-trig-sb" title="Custom size">···</button>
+    </div>
+    <div class="bprev-row">
+      <span class="bprev-lbl">OP</span>
+      <button class="bprev-btn" data-op="30" style="flex-direction:column;gap:1px"><canvas id="op-p30" width="24" height="18"></canvas><span style="font-size:5px;color:var(--mut);line-height:1">30</span></button>
+      <button class="bprev-btn" data-op="60" style="flex-direction:column;gap:1px"><canvas id="op-p60" width="24" height="18"></canvas><span style="font-size:5px;color:var(--mut);line-height:1">60</span></button>
+      <button class="bprev-btn cur" data-op="95" style="flex-direction:column;gap:1px"><canvas id="op-p95" width="24" height="18"></canvas><span style="font-size:5px;color:var(--mut);line-height:1">95</span></button>
+      <button class="bprev-more" id="op-trig-sb" title="Custom opacity">···</button>
+    </div>
+  </div>
+
+  <!-- Colors: 5 swatches + arrow button to open picker, one row -->
+  <div id="colors" class="card">
+    <div class="cw on" style="background:#000000" data-c="#000000"></div>
+    <div class="cw" style="background:#ffffff;border:1px solid var(--bdr)" data-c="#ffffff"></div>
+    <div class="cw" style="background:#c0392b" data-c="#c0392b"></div>
+    <div class="cw" style="background:#2563a8" data-c="#2563a8"></div>
+    <div class="cw" id="cw-bg" style="background:#f4f1ea;border:1px solid var(--bdr)" data-c="#f4f1ea" title="Background color"></div>
+    <button id="ccpick-btn" style="width:22px;height:26px;border-radius:5px;border:1px solid var(--bdr);background:transparent;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;position:relative;-webkit-tap-highlight-color:transparent">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="5" r="3.5" stroke="url(#cpg)"/><defs><linearGradient id="cpg"><stop offset="0%" stop-color="#e03040"/><stop offset="33%" stop-color="#40c040"/><stop offset="66%" stop-color="#2060c0"/><stop offset="100%" stop-color="#e03040"/></linearGradient></defs></svg>
+      <input type="color" id="cpick" value="#2a9d8f" style="opacity:0;position:absolute;inset:0;width:100%;height:100%;cursor:pointer">
+    </button>
+  </div>
+
+  </div><!-- /sg-top -->
+
+</div>
+
+<!-- Side tab — tap to hide, drag to resize -->
+<div id="stab" style="position:fixed;top:50%;left:0;transform:translateY(-50%);z-index:201" title="Tap to hide · drag to resize">
+  <span></span>
+</div>
+
+<!-- Stroke selection gizmo — appears when stroke is selected -->
+<div id="sgizmo" class="card">
+  <div id="sgizmo-handle"><div id="sgizmo-pill"></div></div>
+  <div class="srow">
+    <button class="btn btn-sft mode" id="sg-all" title="Show all transform handles (move + rotate + scale)">
+      <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5"/><polyline points="5,4 7,2 9,4"/><polyline points="5,10 7,12 9,10"/><polyline points="4,5 2,7 4,9"/><polyline points="10,5 12,7 10,9"/></svg>&nbsp;All
+    </button>
+    <button class="btn btn-sft on mode" id="sg-move">
+      <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,4 7,2 9,4"/><line x1="7" y1="2" x2="7" y2="12"/><polyline points="5,10 7,12 9,10"/><polyline points="4,5 2,7 4,9"/><line x1="2" y1="7" x2="12" y2="7"/><polyline points="10,5 12,7 10,9"/></svg>&nbsp;Move
+    </button>
+    <button class="btn btn-sft mode" id="sg-rotate">
+      <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10Q3 7 5 5Q8 2 11 5"/><polyline points="10,3 11,5 9,6"/></svg>&nbsp;Rot
+    </button>
+    <button class="btn btn-sft mode" id="sg-scale">
+      <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="6" rx="1"/><line x1="7" y1="1" x2="7" y2="4"/><line x1="7" y1="10" x2="7" y2="13"/><line x1="1" y1="7" x2="4" y2="7"/><line x1="10" y1="7" x2="13" y2="7"/></svg>&nbsp;Scale
+    </button>
+  </div>
+  <div class="srow">
+    <button class="btn btn-sft" id="sg-dup" title="Duplicate (Ctrl+D)">
+      <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="8" height="8" rx="1"/><path d="M2 10L2 2L10 2"/></svg>&nbsp;Dup
+    </button>
+    <button class="btn btn-sft danger" id="sg-del">
+      <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,4 12,4"/><path d="M5 4L5 2L9 2L9 4"/><path d="M3 4L4 13L10 13L11 4"/></svg>&nbsp;Del
+    </button>
+    <button class="btn btn-sft" id="sg-loft" title="Loft a temporary drawing plane through selected strokes (2+)">⟁ Loft</button>
+    <button class="btn btn-sft" id="sg-loft-solid" title="Loft selected strokes as a ref solid (2+)" style="display:none">~ Solid</button>
+    <button class="btn btn-sft" id="sg-addmode" title="Multi-select is always on" style="display:none">+ADD</button>
+    <button class="btn btn-sft" id="sg-close" title="Deselect (Esc)">✕</button>
+  </div>
+  <div class="pg-color-row" id="sg-colors">
+    <div class="pg-csw" data-sc="#000000" style="background:#000000"></div>
+    <div class="pg-csw" data-sc="#ffffff" style="background:#ffffff;border-color:#aaa"></div>
+    <div class="pg-csw" data-sc="#c0392b" style="background:#c0392b"></div>
+    <div class="pg-csw" data-sc="#2563a8" style="background:#2563a8"></div>
+    <div class="pg-csw" data-sc="#1a9940" style="background:#1a9940"></div>
+    <div class="pg-csw" data-sc="#e0c040" style="background:#e0c040"></div>
+    <div class="pg-csw" data-sc="#8b5cf6" style="background:#8b5cf6"></div>
+    <div class="pg-csw" data-sc="#cdb899" style="background:#cdb899;border-color:#aaa"></div>
+    <input type="color" id="sg-cpick" value="#000000" title="Custom color"
+      style="width:22px;height:22px;border:1px solid var(--bdr);border-radius:4px;padding:0;cursor:pointer;background:transparent">
+  </div>
+  <div class="srow" style="align-items:center;padding:2px 8px 0;gap:3px">
+    <span style="font-size:6px;color:var(--mut);font-family:'DM Mono',monospace;flex-shrink:0">W</span>
+    <button class="bprev-btn sg-sz-btn" data-sgsz="1" style="width:22px;height:20px;flex-shrink:0;font-size:6px">1</button>
+    <button class="bprev-btn sg-sz-btn" data-sgsz="3" style="width:22px;height:20px;flex-shrink:0;font-size:6px">3</button>
+    <button class="bprev-btn sg-sz-btn" data-sgsz="6" style="width:22px;height:20px;flex-shrink:0;font-size:6px">6</button>
+    <input type="range" id="sg-width" min="1" max="20" value="1" title="Width"
+      style="flex:1;height:14px;accent-color:var(--ink);cursor:pointer;min-width:40px">
+    <span id="sg-w-val" style="font-size:6px;color:var(--mut);font-family:'DM Mono',monospace;width:12px;text-align:right;flex-shrink:0">1</span>
+  </div>
+  <div class="srow" style="align-items:center;padding:2px 8px 4px;gap:3px">
+    <span style="font-size:6px;color:var(--mut);font-family:'DM Mono',monospace;flex-shrink:0">OP</span>
+    <button class="bprev-btn sg-op-btn" data-sgop="30" style="width:22px;height:20px;flex-shrink:0;font-size:6px">30</button>
+    <button class="bprev-btn sg-op-btn" data-sgop="60" style="width:22px;height:20px;flex-shrink:0;font-size:6px">60</button>
+    <button class="bprev-btn sg-op-btn" data-sgop="95" style="width:22px;height:20px;flex-shrink:0;font-size:6px">95</button>
+    <input type="range" id="sg-opacity" min="10" max="100" value="95" title="Opacity"
+      style="flex:1;height:14px;accent-color:var(--ink);cursor:pointer;min-width:40px">
+    <span id="sg-op-val" style="font-size:6px;color:var(--mut);font-family:'DM Mono',monospace;width:16px;text-align:right;flex-shrink:0">95</span>
+  </div>
+  <canvas id="sg-gc" width="148" height="148" style="display:block;width:148px;height:148px;cursor:crosshair"></canvas>
+  <div id="sg-precision" style="display:none;font-size:7px;color:var(--ink);font-family:'DM Mono',monospace;text-align:center;padding:0 8px 2px;letter-spacing:.03em"></div>
+  <div id="sgizmo-hint">drag to transform selected stroke</div>
+  <div class="scale-dot corner-br" data-scaletarget="sgizmo" title="Drag to scale"></div>
+</div>
+
+<!-- Ref Objects floating hamburger trigger (under eye button) -->
+<button id="bprims" title="Ref objects">
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="4" x2="12" y2="4"/><line x1="2" y1="7" x2="12" y2="7"/><line x1="2" y1="10" x2="12" y2="10"/></svg>
+</button>
+
+<!-- Single-line ref toolbar (under topbar, toggleable) -->
+<div id="prim-bar">
+  <button class="prim-tb-btn" id="prim-add-box" title="Add box">
+    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="10" height="8" rx="1"/><path d="M2 4L7 1L12 4"/><path d="M12 12L7 9L2 12"/><line x1="7" y1="1" x2="7" y2="9"/></svg>
+  </button>
+  <button class="prim-tb-btn" id="prim-add-sphere" title="Add sphere">
+    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5.5"/><ellipse cx="7" cy="7" rx="2.5" ry="5.5"/><path d="M1.5 7Q7 5 12.5 7"/></svg>
+  </button>
+  <button class="prim-tb-btn" id="prim-add-cylinder" title="Add cylinder">
+    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="7" cy="3" rx="4.5" ry="1.8"/><line x1="2.5" y1="3" x2="2.5" y2="11"/><line x1="11.5" y1="3" x2="11.5" y2="11"/><path d="M2.5 11Q7 13 11.5 11"/></svg>
+  </button>
+  <button class="prim-tb-btn" id="prim-add-cone" title="Add cone">
+    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="1" x2="2.5" y2="11"/><line x1="7" y1="1" x2="11.5" y2="11"/><path d="M2.5 11Q7 13 11.5 11"/></svg>
+  </button>
+  <button class="prim-tb-btn" id="prim-add-plane" title="Add plane">
+    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M1 10L5 4L13 4L9 10Z"/></svg>
+  </button>
+  <div class="prim-tb-sep"></div>
+  <button class="prim-tb-btn" id="prim-list-btn" title="Objects list">
+    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><line x1="1" y1="3" x2="13" y2="3"/><line x1="1" y1="7" x2="13" y2="7"/><line x1="1" y1="11" x2="13" y2="11"/><circle cx="3" cy="3" r="1" fill="currentColor" stroke="none"/><circle cx="3" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="3" cy="11" r="1" fill="currentColor" stroke="none"/></svg>
+  </button>
+  <span id="prim-obj-count"></span>
+  <div class="prim-tb-sep"></div>
+  <button class="prim-tb-btn" id="prim-sel-btn" title="Tap scene to select ref object">
+    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3L3 10L6 8L8 12L10 11L8 7L11 7Z"/></svg>
+  </button>
+  <button class="prim-tb-btn" id="prim-asplane-btn" title="Use selected ref as drawing plane">
+    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10L7 5L12 10"/><path d="M2 10L7 13L12 10L7 5Z" stroke-width="1"/></svg>
+  </button>
+  <button class="prim-tb-btn on" id="prim-eye-btn" title="Show/hide all ref objects">
+    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M1 7Q3 4 7 4Q11 4 13 7Q11 10 7 10Q3 10 1 7Z"/><circle cx="7" cy="7" r="2"/></svg>
+  </button>
+</div>
+
+<!-- Sub-popup: object list (drops from prim-bar Obj button) -->
+<div id="prims-pop">
+  <div id="prim-stack"></div>
+</div>
+
+<!-- Primitive gizmo (floating, matches sgizmo structure exactly) -->
+<div id="pgizmo" class="card">
+  <div id="pgizmo-handle"><div id="pgizmo-pill"></div></div>
+  <div class="srow">
+    <button class="btn btn-sft on mode" id="pg-all" title="Show all transform handles">
+      <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5"/><polyline points="5,4 7,2 9,4"/><polyline points="5,10 7,12 9,10"/><polyline points="4,5 2,7 4,9"/><polyline points="10,5 12,7 10,9"/></svg>&nbsp;All
+    </button>
+    <button class="btn btn-sft mode" id="pg-move">
+      <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,4 7,2 9,4"/><line x1="7" y1="2" x2="7" y2="12"/><polyline points="5,10 7,12 9,10"/><polyline points="4,5 2,7 4,9"/><line x1="2" y1="7" x2="12" y2="7"/><polyline points="10,5 12,7 10,9"/></svg>&nbsp;Move
+    </button>
+    <button class="btn btn-sft mode" id="pg-rotate">
+      <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10Q3 7 5 5Q8 2 11 5"/><polyline points="10,3 11,5 9,6"/></svg>&nbsp;Rot
+    </button>
+    <button class="btn btn-sft mode" id="pg-scale">
+      <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="6" rx="1"/><line x1="7" y1="1" x2="7" y2="4"/><line x1="7" y1="10" x2="7" y2="13"/><line x1="1" y1="7" x2="4" y2="7"/><line x1="10" y1="7" x2="13" y2="7"/></svg>&nbsp;Scale
+    </button>
+  </div>
+  <div class="srow">
+    <button class="btn btn-sft" id="pg-dup" title="Duplicate">
+      <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="8" height="8" rx="1"/><path d="M2 10L2 2L10 2"/></svg>&nbsp;Dup
+    </button>
+    <button class="btn btn-sft danger" id="pg-del">
+      <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,4 12,4"/><path d="M5 4L5 2L9 2L9 4"/><path d="M3 4L4 13L10 13L11 4"/></svg>&nbsp;Del
+    </button>
+    <button class="btn btn-sft" id="pg-useplane" title="Use as drawing plane">⬡ Plane</button>
+    <button class="btn btn-sft" id="pg-close" title="Deselect (Esc)">✕</button>
+  </div>
+  <div class="pg-color-row" id="pg-colors">
+    <div class="pg-csw active" data-pc="#ffffff" style="background:#ffffff"></div>
+    <div class="pg-csw" data-pc="#f0f0f0" style="background:#f0f0f0"></div>
+    <div class="pg-csw" data-pc="#b0b0b0" style="background:#b0b0b0"></div>
+    <div class="pg-csw" data-pc="#e05040" style="background:#e05040"></div>
+    <div class="pg-csw" data-pc="#4a90d9" style="background:#4a90d9"></div>
+    <div class="pg-csw" data-pc="#50a050" style="background:#50a050"></div>
+    <div class="pg-csw" data-pc="#e0c040" style="background:#e0c040"></div>
+    <div class="pg-csw" data-pc="#1a1a2e" style="background:#1a1a2e;border-color:#888"></div>
+    <input type="color" id="pg-cpick" value="#ffffff" title="Custom color"
+      style="width:22px;height:22px;border:1px solid var(--bdr);border-radius:4px;padding:0;cursor:pointer;background:transparent">
+  </div>
+  <div class="srow" style="align-items:center;padding:2px 8px 4px;gap:4px">
+    <span style="font-size:6px;color:var(--mut);font-family:'DM Mono',monospace;flex-shrink:0">OP</span>
+    <input type="range" id="pg-opacity" min="5" max="100" value="100" title="Opacity"
+      style="flex:1;height:14px;accent-color:var(--ink);cursor:pointer;min-width:60px">
+    <span id="pg-op-val" style="font-size:6px;color:var(--mut);font-family:'DM Mono',monospace;width:20px;text-align:right;flex-shrink:0">100</span>
+  </div>
+  <canvas id="pg-gc" width="148" height="148" style="display:block;width:148px;height:148px;cursor:crosshair"></canvas>
+  <div id="pg-precision" style="display:none;font-size:7px;color:var(--ink);font-family:'DM Mono',monospace;text-align:center;padding:0 8px 2px;letter-spacing:.03em"></div>
+  <div id="pgizmo-hint">drag to transform ref object</div>
+</div>
+<!-- Pages -->
+<div id="pages"><div id="pg-add" title="New page">+</div></div>
+
+<!-- Views -->
+<div id="views"><button id="vw-rec" title="Record views to video"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" fill="#e03040"/></svg></button><div id="vw-add" title="Save view">+</div></div>
+
+<!-- Status bar -->
+<div id="sbar"><span id="mdot"></span><span id="stxt">DRAW · 2-finger orbit · 3-finger pan</span><button id="sb-sideswitch" title="Flip sidebar to other side">◧◨</button></div>
+<!-- Selection badge (referenced in ui-hidden CSS) -->
+<div id="selbadge" style="display:none"></div>
+
+<!-- Export menu -->
+<div id="expmenu">
+  <button class="emb" id="em-save">Save</button>
+  <button class="emb" id="em-load">Load</button>
+  <div class="emsep"></div>
+  <button class="emb" id="exgltf">glTF (.glb)</button>
+  <button class="emb" id="exobj">OBJ (.obj)</button>
+  <button class="emb" id="exusd">USD (.usda)</button>
+  <button class="emb" id="exusdz">USDZ (.usdz)</button>
+  <div class="emsep"></div>
+  <button class="emb" id="exjson">Scene JSON</button>
+  <div class="emsep"></div>
+  <button class="emb" id="em-png">Screenshot (PNG)</button>
+  <button class="emb" id="em-svg">Vector (SVG)</button>
+  <button class="emb" id="exrecord">Record Views (video)</button>
+  <div class="emsep"></div>
+  <button class="emb" id="em-scale" style="opacity:0.45">Scale: OFF</button>
+</div>
+<input type="file" id="filein" accept=".json" style="display:none">
+
+<!-- Narrow bar -->
+<div id="narrow-bar">
+
+  <!-- ── Hide tab (drag handle / collapse toggle) ── -->
+  <div id="pb-tab" title="Hide/show panel">
+    <div id="pb-tab-handle"></div>
+  </div>
+
+  <!-- ── Three panels ── -->
+  <div id="pb-panels">
+
+    <!-- Panel 1: Nav (NavCube, tap-to-align) -->
+    <div class="pb-panel" id="pb-panel-nav">
+      <div id="fc-nav-resize" title="Drag to resize nav panel"></div>
+      <div class="pb-panel-hdr">
+        <button id="pb-nav-toggle" class="cyc-btn" style="letter-spacing:.03em">⬡ NAV</button>
+        <button id="pb-nav-persp" class="cyc-btn" style="font-size:6.5px;letter-spacing:.04em" title="Toggle perspective/ortho">PERSP</button>
+        <button id="pb-nav-zoom-out" class="cyc-btn" style="flex:none;width:22px;font-size:13px;line-height:1" title="Zoom out">−</button>
+        <button id="pb-nav-zoom-in" class="cyc-btn" style="flex:none;width:22px;font-size:13px;line-height:1" title="Zoom in">+</button>
+        <button id="pb-nav-reset" class="cyc-btn" style="flex:none;width:24px" title="Reset view">⌂</button>
+      </div>
+      <div style="flex:1;position:relative;overflow:hidden;min-height:0">
+        <canvas id="pb-navcube" width="142" height="126" style="display:block;width:142px;height:126px;cursor:grab"></canvas>
+      </div>
+    </div>
+
+    <!-- Panel 2: Gizmo — 1 row of 4 cycle buttons + canvas -->
+    <div class="pb-panel" id="pb-panel-gizmo">
+      <div class="pb-panel-hdr">
+        <button class="cyc-btn on" id="pb-cyc-mode">All</button>
+        <button class="cyc-btn on" id="pb-cyc-plane2">Front</button>
+        <button class="cyc-btn on" id="pb-cyc-axis2">All</button>
+        <button class="cyc-btn on" id="pb-cyc-surf2">Pln</button>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;gap:3px">
+        <div style="position:relative">
+          <canvas id="pb-gc" width="130" height="104" style="border-radius:5px;background:rgba(var(--ink-r),var(--ink-g),var(--ink-b),.02);border:1px solid var(--bdr);cursor:crosshair;display:block;width:130px;height:104px;max-width:100%"></canvas>
+          <div id="pb-ghud-sel-prec" style="display:none;position:absolute;bottom:2px;left:4px;font-size:6.5px;color:var(--ink);font-family:'DM Mono',monospace;letter-spacing:.03em;pointer-events:none;text-shadow:0 0 4px var(--pan),0 0 4px var(--pan)"></div>
+        </div>
+        <div id="pb-ghud-bottom" style="display:flex;align-items:center;gap:3px;width:130px;max-width:100%">
+          <button id="pb-greset" class="btn btn-pill" style="font-size:6px;flex:1;min-width:0;padding:0 3px">RST</button>
+          <button id="pb-gsnap" class="btn btn-pill on" style="font-size:6px;flex:1;min-width:0;padding:0 3px">⊙45°</button>
+          <button id="pb-gface" class="btn btn-pill" style="font-size:6px;flex:1;min-width:0;padding:0 3px" title="Align camera to face">⌖FCE</button>
+          <button id="pb-gview" class="btn btn-pill" style="font-size:6px;flex:1;min-width:0;padding:0 3px" title="Align plane to view">⌖VW</button>
+          <button id="pb-glocal" class="btn btn-pill" style="font-size:6px;flex:1;min-width:0;padding:0 3px" title="Toggle 3D local gizmo overlay">⊕LCL</button>
+          <button id="pb-gc-axmode" class="btn btn-pill on" style="font-size:6px;flex:1;min-width:0;padding:0 3px" title="Toggle local/world axes" onclick="window._gcToggleAxisMode&&window._gcToggleAxisMode()">AXS</button>
+        </div>
+        <div id="pb-ghud-sel" style="display:none;flex-direction:column;gap:2px;width:130px;max-width:100%">
+          <div style="display:flex;gap:2px">
+            <button class="btn btn-pill gc-sel-btn" data-selact="all" style="flex:1;min-width:0;padding:0 3px">All</button>
+            <button class="btn btn-pill gc-sel-btn" data-selact="move" style="flex:1;min-width:0;padding:0 3px">Mv</button>
+            <button class="btn btn-pill gc-sel-btn" data-selact="rotate" style="flex:1;min-width:0;padding:0 3px">Rot</button>
+            <button class="btn btn-pill gc-sel-btn" data-selact="scale" style="flex:1;min-width:0;padding:0 3px">Sc</button>
+          </div>
+          <div style="display:flex;gap:2px">
+            <button class="btn btn-pill gc-sel-btn" data-selact="dup" style="flex:1;min-width:0;padding:0 3px">Dup</button>
+            <button class="btn btn-pill gc-sel-btn" data-selact="loft" style="flex:1;min-width:0;padding:0 3px">⟁Lft</button>
+            <button class="btn btn-pill gc-sel-btn" data-selact="loft-solid" style="flex:1;min-width:0;padding:0 3px;display:none">~Sld</button>
+            <button class="btn btn-pill gc-sel-btn danger" data-selact="del" style="flex:1;min-width:0;padding:0 3px">Del</button>
+            <button class="btn btn-pill gc-sel-btn" data-selact="close" style="flex:1;min-width:0;padding:0 3px">✕</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel 3: FPS controls (shown only in FPS mode) — gesture legend +
+         vertical up/down buttons. No joystick: 2-finger drag looks around,
+         3-finger drag walks, directly on the drawing canvas. -->
+    <div class="pb-panel" id="pb-panel-look">
+      <div class="pb-panel-hdr">
+        <span class="cyc-btn" style="border-color:transparent;cursor:default;text-align:center;display:flex;align-items:center;justify-content:center">FPS</span>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:6px;text-align:center">
+        <div style="font-size:var(--fs-9);color:var(--mut);line-height:1.7;letter-spacing:.02em">
+          <b style="color:var(--ink)">2 fingers</b> drag &nbsp;→&nbsp; look<br>
+          <b style="color:var(--ink)">3 fingers</b> drag &nbsp;→&nbsp; walk<br>
+          1 finger still draws
+        </div>
+        <div style="display:flex;justify-content:center;gap:16px">
+          <button id="pb-fps-vt-down" class="btn" style="width:44px;height:44px;border-radius:50%;font-size:18px;line-height:1" title="Move down">↓</button>
+          <button id="pb-fps-vt-up" class="btn" style="width:44px;height:44px;border-radius:50%;font-size:18px;line-height:1" title="Move up">↑</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Scrollable cycbar: drawing tools ── -->
+  <div id="pb-scroll">
+    <div id="pb-cycbar">
+      <!-- Draw modes -->
+      <button class="btn btn-md on mode" id="pb-draw"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12L9.5 4.5Q11 3 12 4Q13 5 11.5 6.5L4 12Z"/></svg></button>
+      <button class="btn btn-md mode" id="pb-erase"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11L8 4L11 7L6 12Z"/><line x1="1" y1="12" x2="13" y2="12"/></svg></button>
+      <button class="btn btn-md mode" id="pb-select"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3L3 10L6 8L8 12L10 11L8 7L11 7Z"/></svg></button>
+      <div style="width:1px;background:var(--bdr);margin:0 2px;flex-shrink:0"></div>
+      <!-- Brush modifiers -->
+      <button class="btn btn-md" id="pb-flat"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="10" height="4" rx="1"/><line x1="7" y1="9" x2="7" y2="12"/></svg></button>
+      <button class="btn btn-md" id="pb-smooth"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 7Q3 4 5 7Q7 10 9 7Q11 4 13 7"/></svg></button>
+      <button class="btn btn-md on" id="pb-vel"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 9Q3 9 5 7Q7 5 9 5Q11 5 13 7" stroke-width="3" opacity=".35"/><path d="M1 9Q3 9 5 7Q7 5 9 5Q11 5 13 7" stroke-width="1"/></svg></button>
+      <div style="width:1px;background:var(--bdr);margin:0 2px;flex-shrink:0"></div>
+      <!-- Undo + Redo -->
+      <button class="btn btn-md" id="pb-undo"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7Q3 3 7 3Q11 3 11 7Q11 11 7 11"/><polyline points="3,4 3,7 6,7"/></svg></button>
+      <button class="btn btn-md" id="pb-redo"><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 7Q11 3 7 3Q3 3 3 7Q3 11 7 11"/><polyline points="11,4 11,7 8,7"/></svg></button>
+      <button class="btn btn-md" id="pb-depthop" title="Depth plane opacity" style="font-size:10px;width:auto;padding:0 8px;letter-spacing:.04em">50%</button>
+      <button class="btn btn-md on" id="pb-surfgrid" title="Surface grid" style="font-size:10px;width:auto;padding:0 8px;letter-spacing:.04em">DOT</button>
+      <div style="width:1px;background:var(--bdr);margin:0 2px;flex-shrink:0"></div>
+      <!-- Scene toggles -->
+      <button class="btn btn-md on" id="pb-depth" title="Depth cues on/off">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="5"/><path d="M7 2A5 5 0 0 1 7 12" fill="currentColor" stroke="none" opacity=".28"/><circle cx="7" cy="7" r="5"/></svg>
+      </button>
+      <button class="btn btn-md on" id="pb-surf" title="Surface on/off">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10L7 5L12 10"/><path d="M2 10L7 13L12 10L7 5Z" stroke-width="1.2"/></svg>
+      </button>
+      <button class="btn btn-md on" id="pb-grid" title="Grid on/off">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1" width="5" height="5" rx="1"/><rect x="8" y="1" width="5" height="5" rx="1"/><rect x="1" y="8" width="5" height="5" rx="1"/><rect x="8" y="8" width="5" height="5" rx="1"/></svg>
+      </button>
+      <button class="btn btn-md on" id="pb-axis" title="Axis lines on/off">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke-linecap="round"><line x1="7" y1="7" x2="13" y2="7" stroke="#b03020" stroke-width="1.8"/><line x1="7" y1="7" x2="7" y2="1" stroke="#1a9940" stroke-width="1.8"/><line x1="7" y1="7" x2="3" y2="11" stroke="#1e52a0" stroke-width="1.8"/></svg>
+      </button>
+      <div style="width:1px;background:var(--bdr);margin:0 2px;flex-shrink:0"></div>
+      <!-- Input modes -->
+      <button class="btn btn-md" id="pb-gestswap" title="Swap 2-finger gesture" style="font-size:9px;width:auto;padding:0 7px;letter-spacing:.03em">2F=ORB</button>
+      <button class="btn btn-md" id="pb-stylus" title="Stylus mode" style="font-size:9px;width:auto;padding:0 7px;letter-spacing:.03em">FINGER</button>
+      <div style="width:1px;background:var(--bdr);margin:0 2px;flex-shrink:0"></div>
+      <!-- Actions -->
+      <button class="btn btn-md" id="pb-clear" title="Clear all">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,4 12,4"/><path d="M5 4L5 2L9 2L9 4"/><path d="M3 4L4 13L10 13L11 4"/></svg>
+      </button>
+      <button class="btn btn-md" id="pb-bg" title="Background color">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="1" width="12" height="12" rx="2"/><circle cx="7" cy="7" r="3" fill="currentColor" stroke="none" opacity=".3"/></svg>
+      </button>
+      <button class="btn btn-md danger" id="pb-new" title="New scene">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h5l3 3v7H3z"/><path d="M8 2v3h3"/><path d="M10.5 1.5l.6 1.2 1.2.6-1.2.6-.6 1.2-.6-1.2-1.2-.6 1.2-.6z" stroke-width="1.1"/></svg>
+      </button>
+      <div style="width:1px;background:var(--bdr);margin:0 2px;flex-shrink:0"></div>
+      <!-- File operations -->
+      <button class="btn btn-md" id="pb-save" title="Save">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2L10 2L12 4L12 12L2 12Z"/><rect x="4" y="2" width="6" height="4" rx=".5"/><rect x="4" y="8" width="6" height="4" rx=".5"/></svg>
+      </button>
+      <button class="btn btn-md" id="pb-load" title="Load">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5L2 12L12 12L12 5L7 2Z"/><line x1="7" y1="5" x2="7" y2="9"/><polyline points="4,7 7,9 10,7"/></svg>
+      </button>
+      <button class="btn btn-md" id="pb-exp" title="Export 3D">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="9" x2="7" y2="2"/><polyline points="4,5 7,2 10,5"/><path d="M2 10L2 12L12 12L12 10"/></svg>
+      </button>
+      <button class="btn btn-md" id="pb-png" title="Save PNG">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="12" height="9" rx="1.5"/><circle cx="7" cy="7.5" r="2"/><path d="M4 3L5 1L9 1L10 3"/></svg>
+      </button>
+      <div style="width:1px;background:var(--bdr);margin:0 2px;flex-shrink:0"></div>
+      <!-- Pages + Views -->
+      <button class="btn btn-md" id="pb-pgbtn" title="Pages" style="font-size:10px;width:auto;padding:0 9px;letter-spacing:.05em">PGS</button>
+      <button class="btn btn-md" id="pb-vwbtn" title="Saved Views" style="font-size:10px;width:auto;padding:0 9px;letter-spacing:.05em">VWS</button>
+    </div>
+  </div>
+
+  <!-- ── Colors + sliders — fixed row, never scrolls ── -->
+  <div id="pb-colors" style="display:flex;gap:5px;align-items:center;padding:5px 6px 7px;flex-shrink:0;border-top:1px solid var(--bdr);overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;scrollbar-width:none">
+    <!-- Active layer indicator -->
+    <div id="pb-layer-dot" title="Active layer — tap to open Layers" style="width:10px;height:10px;border-radius:50%;background:#b03020;flex-shrink:0;cursor:pointer;-webkit-tap-highlight-color:transparent"></div>
+    <div class="cw on" style="background:#000;width:38px;height:38px;flex-shrink:0" data-c="#000000"></div>
+    <div class="cw" style="background:#fff;border:2px solid var(--bdr);width:38px;height:38px;flex-shrink:0" data-c="#ffffff"></div>
+    <div class="cw" style="background:#c0392b;width:38px;height:38px;flex-shrink:0" data-c="#c0392b"></div>
+    <div class="cw" style="background:#2563a8;width:38px;height:38px;flex-shrink:0" data-c="#2563a8"></div>
+    <div class="cw" style="background:#f4f1ea;border:1px solid var(--bdr);width:38px;height:38px;flex-shrink:0" data-c="#f4f1ea"></div>
+    <button id="pb-ccpick-btn" style="width:34px;height:38px;border-radius:7px;border:1px solid var(--bdr);background:transparent;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;position:relative;-webkit-tap-highlight-color:transparent">
+      <svg width="14" height="14" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="3.5" stroke="url(#cpg2)" stroke-width="1.5"/><defs><linearGradient id="cpg2"><stop offset="0%" stop-color="#e03040"/><stop offset="33%" stop-color="#40c040"/><stop offset="66%" stop-color="#2060c0"/><stop offset="100%" stop-color="#e03040"/></linearGradient></defs></svg>
+      <input type="color" id="pb-cpick" value="#2a9d8f" style="opacity:0;position:absolute;inset:0;width:100%;height:100%;cursor:pointer">
+    </button>
+    <div style="width:1px;height:28px;background:var(--bdr);flex-shrink:0;margin:0 2px"></div>
+    <!-- Size presets -->
+    <button class="bprev-btn cur" data-sz="1" style="width:38px;height:42px;flex-shrink:0;flex-direction:column;gap:2px"><canvas id="sz-p1-pb" width="20" height="16"></canvas><span style="font-size:9px;color:var(--mut);line-height:1">1</span></button>
+    <button class="bprev-btn" data-sz="3" style="width:38px;height:42px;flex-shrink:0;flex-direction:column;gap:2px"><canvas id="sz-p3-pb" width="20" height="16"></canvas><span style="font-size:9px;color:var(--mut);line-height:1">3</span></button>
+    <button class="bprev-btn" data-sz="6" style="width:38px;height:42px;flex-shrink:0;flex-direction:column;gap:2px"><canvas id="sz-p6-pb" width="20" height="16"></canvas><span style="font-size:9px;color:var(--mut);line-height:1">6</span></button>
+    <button class="bprev-more" id="sz-trig-pb" title="Custom size" style="height:42px;flex-shrink:0;font-size:14px">···</button>
+    <div style="width:1px;height:28px;background:var(--bdr);flex-shrink:0;margin:0 2px"></div>
+    <!-- Opacity presets -->
+    <button class="bprev-btn" data-op="30" style="width:38px;height:42px;flex-shrink:0;flex-direction:column;gap:2px"><canvas id="op-p30-pb" width="20" height="16"></canvas><span style="font-size:9px;color:var(--mut);line-height:1">30</span></button>
+    <button class="bprev-btn" data-op="60" style="width:38px;height:42px;flex-shrink:0;flex-direction:column;gap:2px"><canvas id="op-p60-pb" width="20" height="16"></canvas><span style="font-size:9px;color:var(--mut);line-height:1">60</span></button>
+    <button class="bprev-btn cur" data-op="95" style="width:38px;height:42px;flex-shrink:0;flex-direction:column;gap:2px"><canvas id="op-p95-pb" width="20" height="16"></canvas><span style="font-size:9px;color:var(--mut);line-height:1">95</span></button>
+    <button class="bprev-more" id="op-trig-pb" title="Custom opacity" style="height:42px;flex-shrink:0;font-size:14px">···</button>
+  </div>
+
+</div>
+
+<!-- ── Float card: detached nav + gizmo panels in narrow mode ── -->
+<div id="pb-float-card">
+  <div id="fc-handle" class="fc-hdr">
+    <span class="sc-title">CONTROL</span>
+    <div class="fc-hdr-pill"></div>
+    <div class="fc-hdr-btns">
+      <button id="fc-dock-btn" class="fc-hdr-btn" title="Dock to edge">⊞</button>
+      <button id="fc-close" class="fc-hdr-btn" title="Hide panel">✕</button>
+    </div>
+  </div>
+  <div id="fc-panels">
+    <!-- #pb-panel-nav and #pb-panel-gizmo are reparented here by JS on narrow activate -->
+  </div>
+  <div id="fc-resize"><div id="fc-resize-dot"></div><div id="fc-resize-dot"></div><div id="fc-resize-dot"></div></div>
+  <div class="scale-dot corner-br" data-scaletarget="pb-float-card" title="Drag to scale"></div>
+  <div id="fc-snap-hint"></div>
+</div>
+
+<!-- FAB to restore hidden float card -->
+<button id="pb-fab" title="Show nav / gizmo">⬡</button>
+<!-- FAB to restore hidden detached sidecol cards (wide mode). Uses same hex icon as #pb-fab for visual consistency. -->
+<button id="sc-fab" title="Show sidebar panels" style="display:none">⬡</button>
+
+<!-- Floating LCL button group — wide mode, positioned by positionLclFloat() -->
+<div id="lcl-float-group" class="card" style="padding:3px 5px">
+  <button id="lcl-float" class="btn btn-pill" title="Toggle 3D local gizmo overlay">⊕ LCL</button>
+  <button id="lcl-snap" class="btn btn-pill on" title="Toggle 45° snap for local gizmo">⊙45°</button>
+</div>
+<div id="lcl-precision" style="position:fixed;z-index:280;display:none;
+  background:var(--toast-bg);color:var(--toast-fg);font-size:8px;font-family:'DM Mono',monospace;
+  padding:3px 8px;border-radius:5px;pointer-events:none;letter-spacing:.03em;white-space:nowrap"></div>
+
+<!-- ── Hidden-UI mini-toolbar (v14.2, updated v28) ──
+     Visible when body.ui-hidden in ALL modes (including narrow-mode). Toggle button
+     at bottom-left; bar centered at bottom, hidden until toggle is tapped. All buttons
+     delegate to the existing sidecol handlers so state stays in sync automatically. -->
+<button id="sc-hidden-toggle" title="Show/hide quick tools">
+  <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="4" x2="12" y2="4"/><line x1="2" y1="7" x2="12" y2="7"/><line x1="2" y1="10" x2="12" y2="10"/></svg>
+</button>
+<div id="sc-hidden-bar">
+  <!-- Mode buttons (delegate to existing sdraw/serase/sselect) -->
+  <button class="btn btn-md on mode" id="scx-draw" title="Draw (D)">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12L9.5 4.5Q11 3 12 4Q13 5 11.5 6.5L4 12Z"/></svg>
+  </button>
+  <button class="btn btn-md mode" id="scx-erase" title="Erase (E)">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11L8 4L11 7L6 12Z"/><line x1="1" y1="12" x2="13" y2="12"/></svg>
+  </button>
+  <button class="btn btn-md mode" id="scx-select" title="Select (Q)">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3L3 10L6 8L8 12L10 11L8 7L11 7Z"/></svg>
+  </button>
+  <div class="scx-sep"></div>
+  <!-- Brush modifiers -->
+  <button class="btn btn-md" id="scx-flat" title="Flat brush (F)">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="10" height="4" rx="1"/><line x1="7" y1="9" x2="7" y2="12"/></svg>
+  </button>
+  <button class="btn btn-md" id="scx-smooth" title="Smoothing (S)">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 7Q3 4 5 7Q7 10 9 7Q11 4 13 7"/></svg>
+  </button>
+  <button class="btn btn-md on" id="scx-vel" title="Velocity taper (W)">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 9Q3 9 5 7Q7 5 9 5Q11 5 13 7" stroke-width="3" opacity=".35"/><path d="M1 9Q3 9 5 7Q7 5 9 5Q11 5 13 7" stroke-width="1"/></svg>
+  </button>
+  <div class="scx-sep"></div>
+  <!-- Undo / Redo -->
+  <button class="btn btn-md" id="scx-undo" title="Undo">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7Q3 3 7 3Q11 3 11 7Q11 11 7 11"/><polyline points="3,4 3,7 6,7"/></svg>
+  </button>
+  <button class="btn btn-md" id="scx-redo" title="Redo">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 7Q11 3 7 3Q3 3 3 7Q3 11 7 11"/><polyline points="11,4 11,7 8,7"/></svg>
+  </button>
+  <div class="scx-sep"></div>
+  <!-- Size presets (share data-sz with sidecol; global querySelectorAll keeps .cur in sync) -->
+  <button class="bprev-btn cur" data-sz="1"><canvas id="sz-p1-scx" width="20" height="16"></canvas><span style="font-size:5px;color:var(--mut);line-height:1">1</span></button>
+  <button class="bprev-btn" data-sz="3"><canvas id="sz-p3-scx" width="20" height="16"></canvas><span style="font-size:5px;color:var(--mut);line-height:1">3</span></button>
+  <button class="bprev-btn" data-sz="6"><canvas id="sz-p6-scx" width="20" height="16"></canvas><span style="font-size:5px;color:var(--mut);line-height:1">6</span></button>
+  <button class="bprev-more" id="sz-trig-scx" title="Custom size" style="height:30px;flex-shrink:0">···</button>
+  <div class="scx-sep"></div>
+  <!-- Opacity presets -->
+  <button class="bprev-btn" data-op="30"><canvas id="op-p30-scx" width="20" height="16"></canvas><span style="font-size:5px;color:var(--mut);line-height:1">30</span></button>
+  <button class="bprev-btn" data-op="60"><canvas id="op-p60-scx" width="20" height="16"></canvas><span style="font-size:5px;color:var(--mut);line-height:1">60</span></button>
+  <button class="bprev-btn cur" data-op="95"><canvas id="op-p95-scx" width="20" height="16"></canvas><span style="font-size:5px;color:var(--mut);line-height:1">95</span></button>
+  <button class="bprev-more" id="op-trig-scx" title="Custom opacity" style="height:30px;flex-shrink:0">···</button>
+  <div class="scx-sep"></div>
+  <!-- Colors (share .cw + data-c with sidecol; global .cw handler keeps .on in sync) -->
+  <div class="cw on" style="background:#000000" data-c="#000000"></div>
+  <div class="cw" style="background:#ffffff;border:1px solid var(--bdr)" data-c="#ffffff"></div>
+  <div class="cw" style="background:#c0392b" data-c="#c0392b"></div>
+  <div class="cw" style="background:#2563a8" data-c="#2563a8"></div>
+  <div class="cw" style="background:#f4f1ea;border:1px solid var(--bdr)" data-c="#f4f1ea"></div>
+  <button id="scx-ccpick-btn" style="width:22px;height:26px;border-radius:5px;border:1px solid var(--bdr);background:transparent;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;position:relative;-webkit-tap-highlight-color:transparent">
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="3.5" stroke="url(#cpg3)" stroke-width="1.5"/><defs><linearGradient id="cpg3"><stop offset="0%" stop-color="#e03040"/><stop offset="33%" stop-color="#40c040"/><stop offset="66%" stop-color="#2060c0"/><stop offset="100%" stop-color="#e03040"/></linearGradient></defs></svg>
+    <input type="color" id="scx-cpick" value="#2a9d8f" style="opacity:0;position:absolute;inset:0;width:100%;height:100%;cursor:pointer">
+  </button>
+</div>
+
+<!-- Cycle button popovers (shared, repositioned on open) -->
+<div class="cyc-pop" id="pop-plane">
+  <button class="cyc-pop-item" data-cyc-plane="xz">Front</button>
+  <button class="cyc-pop-item" data-cyc-plane="xy">Top</button>
+  <button class="cyc-pop-item" data-cyc-plane="yz">Side</button>
+</div>
+<div class="cyc-pop" id="pop-surf">
+  <button class="cyc-pop-item" data-cyc-surf="plane">Plane</button>
+  <button class="cyc-pop-item" data-cyc-surf="cube">Cube</button>
+  <button class="cyc-pop-item" data-cyc-surf="cylinder">Cylinder</button>
+  <button class="cyc-pop-item" data-cyc-surf="sphere">Sphere</button>
+  <button class="cyc-pop-item" data-cyc-surf="cone">Cone</button>
+  <button class="cyc-pop-item" data-cyc-surf="loft">Loft ⟁</button>
+  <button class="cyc-pop-item" data-cyc-surf="none">Off</button>
+</div>
+<div class="cyc-pop" id="pop-axis">
+  <button class="cyc-pop-item" data-cyc-axis="all">All</button>
+  <button class="cyc-pop-item" data-cyc-axis="x">X</button>
+  <button class="cyc-pop-item" data-cyc-axis="y">Y</button>
+  <button class="cyc-pop-item" data-cyc-axis="z">Z</button>
+</div>
+<!-- Gizmo panel 4-button popovers -->
+<div class="cyc-pop" id="pop-mode">
+  <button class="cyc-pop-item" data-cyc-mode="all">All</button>
+  <button class="cyc-pop-item" data-cyc-mode="move">Move</button>
+  <button class="cyc-pop-item" data-cyc-mode="rotate">Rotate</button>
+  <button class="cyc-pop-item" data-cyc-mode="scale">Scale</button>
+</div>
+<div class="cyc-pop" id="pop-plane2">
+  <button class="cyc-pop-item" data-cyc-plane2="xz">Front</button>
+  <button class="cyc-pop-item" data-cyc-plane2="xy">Top</button>
+  <button class="cyc-pop-item" data-cyc-plane2="yz">Side</button>
+</div>
+<div class="cyc-pop" id="pop-axis2">
+  <button class="cyc-pop-item" data-cyc-axis2="all">All</button>
+  <button class="cyc-pop-item" data-cyc-axis2="x">X</button>
+  <button class="cyc-pop-item" data-cyc-axis2="y">Y</button>
+  <button class="cyc-pop-item" data-cyc-axis2="z">Z</button>
+</div>
+<div class="cyc-pop" id="pop-surf2">
+  <button class="cyc-pop-item" data-cyc-surf2="plane">Plane</button>
+  <button class="cyc-pop-item" data-cyc-surf2="cube">Cube</button>
+  <button class="cyc-pop-item" data-cyc-surf2="cylinder">Cylinder</button>
+  <button class="cyc-pop-item" data-cyc-surf2="sphere">Sphere</button>
+  <button class="cyc-pop-item" data-cyc-surf2="cone">Cone</button>
+  <button class="cyc-pop-item" data-cyc-surf2="loft">Loft ⟁</button>
+  <button class="cyc-pop-item" data-cyc-surf2="none">Off</button>
+</div>
+
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/core-scene-setup.js"></script>
+<script src="js/local-plane-gizmo.js"></script>
+<script src="js/rendering-strokes.js"></script>
+<script src="js/input-gestures.js"></script>
+<script src="js/pages-views-io.js"></script>
+<script src="js/record-surface-gizmo.js"></script>
+<script src="js/stroke-gizmo.js"></script>
+<script src="js/loft-primitives.js"></script>
+<script src="js/navigation-controls.js"></script>
+<script src="js/narrow-ui-bindings.js"></script>
+<script src="js/sidecol-floatcard.js"></script>
+<script src="js/selection-ruler.js"></script>
+</body>
+</html>
