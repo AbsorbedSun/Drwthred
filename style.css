@@ -246,19 +246,16 @@ body.ui-hidden #sc-hidden-bar.scx-open{display:flex}
 /* ── Strip-open shift: bump bottom controls above open strips ── */
 body.views-open #sc-hidden-toggle{bottom:80px}
 body.views-open #sc-hidden-bar{bottom:80px}
-body.views-open #sbar{bottom:80px}
 body.views-open:not(.narrow-mode) #sidecol{bottom:140px}
 body.views-open.ui-hidden #lcl-float-group{bottom:124px!important}
 body.views-open.ui-hidden #sc-fab{bottom:166px!important}
 body.pages-open.views-open #sc-hidden-toggle{bottom:148px}
 body.pages-open.views-open #sc-hidden-bar{bottom:148px}
-body.pages-open.views-open #sbar{bottom:148px}
 body.pages-open.views-open:not(.narrow-mode) #sidecol{bottom:206px}
 body.pages-open.views-open.ui-hidden #lcl-float-group{bottom:192px!important}
 body.pages-open.views-open.ui-hidden #sc-fab{bottom:234px!important}
 body.pages-open:not(.views-open) #sc-hidden-toggle{bottom:80px}
 body.pages-open:not(.views-open) #sc-hidden-bar{bottom:80px}
-body.pages-open:not(.views-open) #sbar{bottom:80px}
 body.pages-open:not(.views-open):not(.narrow-mode) #sidecol{bottom:140px}
 body.pages-open:not(.views-open).ui-hidden #lcl-float-group{bottom:124px!important}
 body.pages-open:not(.views-open).ui-hidden #sc-fab{bottom:166px!important}
@@ -408,13 +405,20 @@ body.ui-hidden #lcl-float-group{bottom:52px}
 .lbtn.active{background:color-mix(in srgb, var(--ink) 14%, transparent);color:var(--ink);border-color:color-mix(in srgb, var(--ink) 35%, transparent);font-weight:500}
 .ldot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 
-/* ── STATUS BAR ── */
-#sbar{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);font-size:var(--fs-75);color:var(--mut);
-  background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r-6);padding:3px 9px;
-  pointer-events:none;letter-spacing:.04em;white-space:nowrap;box-shadow:0 1px 6px rgba(0,0,0,.05);z-index:100;
-  transition:bottom .2s ease}
-#mdot{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--ink);
-  margin-right:4px;vertical-align:middle;transition:background .2s}
+/* ── STATUS HUD — collapsed to a single dot by default; tap reveals the
+   mode label + gesture hint + side-switch. Colored dot alone already
+   tells you the active mode at a glance (see dotColors in JS). ── */
+#sbar{position:fixed;top:8px;left:8px;z-index:260;display:flex;align-items:center;gap:6px}
+#mdot{width:30px;height:30px;border-radius:50%;border:1px solid var(--bdr);
+  background:var(--ink);cursor:pointer;padding:0;flex-shrink:0;-webkit-tap-highlight-color:transparent;
+  box-shadow:0 1px 6px rgba(0,0,0,.08);transition:background .2s,transform .12s}
+#mdot:active{transform:scale(.9)}
+#hud-detail{display:flex;align-items:center;gap:4px;font-size:var(--fs-75);color:var(--mut);
+  background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r-6);padding:5px 9px;
+  letter-spacing:.04em;white-space:nowrap;box-shadow:0 1px 6px rgba(0,0,0,.05);
+  opacity:0;transform:translateX(-4px) scale(.96);transform-origin:left center;
+  pointer-events:none;transition:opacity .15s ease,transform .15s ease}
+#sbar.open #hud-detail{opacity:1;transform:translateX(0) scale(1);pointer-events:auto}
 
 /* ── PAGES STRIP ── */
 #pages{position:fixed;bottom:0;left:0;right:0;height:64px;z-index:190;background:var(--pan);
@@ -632,7 +636,7 @@ body.ui-hidden #prim-bar{display:none!important}
 .fc-hdr-btn:active{background:color-mix(in srgb, var(--ink) 15%, transparent)}
 .fc-hdr-btn.lit{border-color:var(--ink);opacity:.7}
 
-#toast{position:fixed;bottom:72px;left:50%;transform:translateX(-50%) translateY(6px);
+#toast{position:fixed;bottom:calc(var(--pb-h,180px) + 16px);left:50%;transform:translateX(-50%) translateY(6px);
   background:var(--toast-bg);color:var(--toast-fg);font-size:var(--fs-8);letter-spacing:.06em;
   padding:5px 12px;border-radius:var(--r-20);z-index:500;pointer-events:none;opacity:0;
   transition:opacity .15s,transform .15s;white-space:nowrap}
@@ -842,7 +846,6 @@ body.ui-hidden #sc-fab{top:auto;right:auto;left:10px;bottom:94px}
 @media(max-aspect-ratio:2/3){
   #topbar{top:6px;padding:3px 6px;gap:2px;max-width:calc(100vw - 80px)}
   #sidecol{display:none}
-  #sbar{bottom:6px}
   #bhide{top:6px}
   #bprims{top:42px}
   #prim-bar{top:44px;max-width:calc(100vw - 16px)}

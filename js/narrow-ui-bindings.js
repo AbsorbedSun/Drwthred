@@ -1423,3 +1423,29 @@ document.getElementById('scx-cpick').addEventListener('input',function(){
 //  SIDECOL — side toggle, scale via #stab (zoom), detach groups, scale dots
 // ================================================================
 
+// ── Status HUD — collapsed to a dot by default; tap reveals mode/gesture
+//    text + the side-switch button. Closes on its own after a few seconds,
+//    or immediately if you tap anywhere else. ──
+(function(){
+  var sbar=document.getElementById('sbar');
+  var dot=document.getElementById('mdot');
+  if(!sbar||!dot)return;
+  var closeTimer=null;
+  function openHud(){
+    sbar.classList.add('open');
+    clearTimeout(closeTimer);
+    closeTimer=setTimeout(closeHud,3500);
+  }
+  function closeHud(){sbar.classList.remove('open');clearTimeout(closeTimer);closeTimer=null;}
+  dot.addEventListener('click',function(e){
+    e.stopPropagation();
+    if(sbar.classList.contains('open'))closeHud();else openHud();
+  });
+  document.addEventListener('click',function(e){
+    if(sbar.classList.contains('open')&&!sbar.contains(e.target))closeHud();
+  });
+  document.addEventListener('touchstart',function(e){
+    if(sbar.classList.contains('open')&&!sbar.contains(e.target))closeHud();
+  },{passive:true});
+})();
+

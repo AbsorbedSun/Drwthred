@@ -637,7 +637,13 @@
 <div id="views"><button id="vw-rec" title="Record views to video"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5" fill="#e03040"/></svg></button><div id="vw-add" title="Save view">+</div></div>
 
 <!-- Status bar -->
-<div id="sbar"><span id="mdot"></span><span id="stxt">DRAW · 2-finger orbit · 3-finger pan</span><button id="sb-sideswitch" title="Flip sidebar to other side">◧◨</button></div>
+<div id="sbar">
+  <button id="mdot" title="Status &amp; gestures — tap to show" aria-label="Status"></button>
+  <div id="hud-detail">
+    <span id="stxt">DRAW · 2F orbit · 3F pan</span>
+    <button id="sb-sideswitch" title="Flip panel to other side">◧◨</button>
+  </div>
+</div>
 <!-- Selection badge (referenced in ui-hidden CSS) -->
 <div id="selbadge" style="display:none"></div>
 
