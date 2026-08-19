@@ -550,7 +550,7 @@ body.rside #bprims{right:auto;left:8px}
 body.rside.fps-active #bprims{left:auto;right:170px}
 
 /* Single-line toolbar under topbar */
-#prim-bar{position:fixed;top:46px;left:50%;transform:translateX(-50%);z-index:199;
+#prim-bar{position:fixed;top:62px;left:50%;transform:translateX(-50%);z-index:199;
   display:none;align-items:center;gap:3px;padding:3px 8px;
   background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r-8);
   box-shadow:0 2px 10px rgba(0,0,0,.1);backdrop-filter:blur(12px);
@@ -735,14 +735,17 @@ body.selecting{cursor:crosshair!important}body.selecting *{cursor:crosshair!impo
 
 /* Sidecol-detached FAB — same look, top-right corner (below #bhide) so user
    recognises the "bring back UI" icon family from the narrow-mode float card. */
-#sc-fab{position:fixed;top:84px;right:8px;z-index:251;
+#sc-fab{position:fixed;top:96px;right:8px;z-index:251;
   width:32px;height:32px;border-radius:50%;
   background:var(--pan);border:1px solid var(--bdr);
   box-shadow:0 2px 10px rgba(0,0,0,.18);
   color:var(--ink);font-size:var(--fs-14);cursor:pointer;
   align-items:center;justify-content:center;
   -webkit-tap-highlight-color:transparent;touch-action:none}
-body.rside #sc-fab{right:auto;left:8px}
+/* Stays on the right always — even in rside mode — so it never stacks on
+   top of #bprims (the shapes/hamburger toggle), which DOES flip to the
+   left in rside. They're independent controls; no reason to fight for
+   the same corner. */
 /* When UI is hidden, move sc-fab into the left column above LCL:
    stack reads bottom-up: ≡ (10) → LCL (52) → sc-fab (94) */
 body.ui-hidden #sc-fab{top:auto;right:auto;left:10px;bottom:94px}
@@ -848,5 +851,5 @@ body.ui-hidden #sc-fab{top:auto;right:auto;left:10px;bottom:94px}
   #sidecol{display:none}
   #bhide{top:6px}
   #bprims{top:42px}
-  #prim-bar{top:44px;max-width:calc(100vw - 16px)}
+  #prim-bar{top:58px;max-width:calc(100vw - 16px)}
 }
