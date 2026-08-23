@@ -6,6 +6,7 @@
 import { register } from '../hud-manager.js';
 import { getState, subscribe } from '../../core/store.js';
 import { addLayer, setActiveLayer, toggleLayerVisibility } from '../../drawing/layers.js';
+import { icon } from '../icons.js';
 
 export function createLayersPanel({ id, slot, order }) {
   const wrap = document.createElement('div');
@@ -13,7 +14,7 @@ export function createLayersPanel({ id, slot, order }) {
 
   const trigger = document.createElement('button');
   trigger.className = 'hud-trigger';
-  trigger.textContent = '▤';
+  trigger.innerHTML = icon('layers');
   trigger.title = 'Capas';
 
   const panel = document.createElement('div');
@@ -39,7 +40,7 @@ export function createLayersPanel({ id, slot, order }) {
 
       const eye = document.createElement('button');
       eye.className = 'layer-eye';
-      eye.textContent = layer.visible ? '◉' : '◯';
+      eye.innerHTML = layer.visible ? icon('eyeOpen') : icon('eyeClosed');
       eye.title = layer.visible ? 'Ocultar' : 'Mostrar';
       eye.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -58,7 +59,7 @@ export function createLayersPanel({ id, slot, order }) {
 
     const addBtn = document.createElement('button');
     addBtn.className = 'layer-add-btn';
-    addBtn.textContent = '+ Nueva capa';
+    addBtn.innerHTML = icon('plus') + '<span>Nueva capa</span>';
     addBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       addLayer();

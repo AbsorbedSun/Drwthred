@@ -6,22 +6,34 @@
 // `draw` que le pasen — la proyección a 3D es responsabilidad de
 // drawing/plane-projection.js, no de este módulo.
 //
-// Vocabulario heredado y validado en el proyecto anterior:
-//   1 dedo  → dibujar
-//   2 dedos → orbitar (mirar alrededor) + pellizco = zoom
-//   3 dedos → pan (desplazar el target)
+// El lápiz (pointerType 'pen') es un canal aparte de los dedos, no un
+// puntero más en la cuenta: mientras esté activo, dibuja siempre y los
+// dedos quedan libres para navegar — "dibujar preferiblemente con lápiz
+// en vez de con un dedo", como se pidió. Sin lápiz de por medio, el
+// vocabulario de siempre sigue intacto:
+//   1 dedo  → dibujar/herramienta activa
+//   2 dedos → orbitar + pellizco = zoom
+//   3 dedos → pan
+// Con el lápiz activo, los dedos se corren un lugar (ya no hace falta
+// reservar el primero para dibujar):
+//   1 dedo  → orbitar + pellizco = zoom
+//   2 dedos → pan
 // ============================================================================
 export function attachGestures(el, camCtl, draw) {
-  const pointers = new Map(); // pointerId -> {x, y}
+  const pointers = new Map(); // pointerId -> {x, y, type}
+  let penId = null;
 
-  function centroid() {
-    const pts = [...pointers.values()];
+  function nonPenPointers() {
+    const out = [];
+    pointers.forEach((p, id) => { if (id !== penId) out.push(p); });
+    return out;
+  }
+  function centroidOf(pts) {
     const x = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const y = pts.reduce((s, p) => s + p.y, 0) / pts.length;
     return { x, y };
   }
-  function pinchDistance() {
-    const pts = [...pointers.values()];
+  function pinchDistanceOf(pts) {
     if (pts.length < 2) return 0;
     return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
   }
@@ -38,52 +50,96 @@ export function attachGestures(el, camCtl, draw) {
 
   function onDown(e) {
     try { el.setPointerCapture(e.pointerId); } catch (err) { /* no crítico */ }
-    const hadOne = pointers.size === 1;
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    const n = pointers.size;
 
-    if (n === 1 && draw) {
+    if (e.pointerType === 'pen' && penId === null) {
+      // Si algún dedo estaba dibujando a medio camino, se cierra en vez
+      // de perderse — el lápiz toma la posta de forma limpia.
+      if (draw && draw.isDrawing()) draw.onEnd();
+      penId = e.pointerId;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
+      if (draw) {
+        const ndc = toNDC(e.clientX, e.clientY);
+        draw.onStart(ndc.x, ndc.y);
+      }
+      return;
+    }
+
+    const penActive = penId !== null;
+    const hadOneTouch = nonPenPointers().length === 1;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
+    const touches = nonPenPointers();
+
+    if (!penActive && touches.length === 1 && draw) {
       const ndc = toNDC(e.clientX, e.clientY);
       draw.onStart(ndc.x, ndc.y);
-    } else if (hadOne && draw && draw.isDrawing()) {
+    } else if (!penActive && hadOneTouch && draw && draw.isDrawing()) {
       // pasamos de 1 a 2+ dedos con un trazo a medio hacer: se cierra,
       // no se pierde, y arrancamos navegación en su lugar.
       draw.onEnd();
     }
 
-    lastCentroid = centroid();
-    lastPinchDist = pinchDistance();
+    lastCentroid = touches.length ? centroidOf(touches) : null;
+    lastPinchDist = pinchDistanceOf(touches);
   }
 
   function onMove(e) {
     if (!pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    const n = pointers.size;
-    const c = centroid();
+    const prevType = pointers.get(e.pointerId).type;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: prevType });
 
-    if (n === 1 && draw && draw.isDrawing()) {
+    if (e.pointerId === penId) {
+      if (draw) {
+        const ndc = toNDC(e.clientX, e.clientY);
+        draw.onMove(ndc.x, ndc.y);
+      }
+      return;
+    }
+
+    const penActive = penId !== null;
+    const touches = nonPenPointers();
+    const c = touches.length ? centroidOf(touches) : null;
+    const orbitAt = penActive ? 1 : 2;
+    const panAt = penActive ? 2 : 3;
+
+    if (!penActive && touches.length === 1 && draw && draw.isDrawing()) {
       const ndc = toNDC(e.clientX, e.clientY);
       draw.onMove(ndc.x, ndc.y);
-    } else if (n === 2) {
-      if (lastCentroid) camCtl.orbit(c.x - lastCentroid.x, c.y - lastCentroid.y);
-      const d = pinchDistance();
+    } else if (touches.length === orbitAt) {
+      if (lastCentroid && c) camCtl.orbit(c.x - lastCentroid.x, c.y - lastCentroid.y);
+      const d = pinchDistanceOf(touches);
       if (lastPinchDist) camCtl.zoom(lastPinchDist / d);
       lastPinchDist = d;
-    } else if (n >= 3) {
-      if (lastCentroid) camCtl.pan(c.x - lastCentroid.x, c.y - lastCentroid.y);
+    } else if (touches.length >= panAt) {
+      if (lastCentroid && c) camCtl.pan(c.x - lastCentroid.x, c.y - lastCentroid.y);
     }
     lastCentroid = c;
   }
 
   function onUp(e) {
-    const wasOne = pointers.size === 1;
+    if (e.pointerId === penId) {
+      pointers.delete(e.pointerId);
+      penId = null;
+      if (draw && draw.isDrawing()) {
+        const ndc = toNDC(e.clientX, e.clientY);
+        draw.onEnd(ndc.x, ndc.y);
+      }
+      const touches = nonPenPointers();
+      lastCentroid = touches.length ? centroidOf(touches) : null;
+      lastPinchDist = pinchDistanceOf(touches);
+      return;
+    }
+
+    const penActive = penId !== null;
+    const wasOneTouch = nonPenPointers().length === 1;
     pointers.delete(e.pointerId);
-    if (wasOne && draw && draw.isDrawing()) {
+
+    if (!penActive && wasOneTouch && draw && draw.isDrawing()) {
       const ndc = toNDC(e.clientX, e.clientY);
       draw.onEnd(ndc.x, ndc.y);
     }
-    lastCentroid = pointers.size ? centroid() : null;
-    lastPinchDist = pointers.size >= 2 ? pinchDistance() : null;
+    const touches = nonPenPointers();
+    lastCentroid = touches.length ? centroidOf(touches) : null;
+    lastPinchDist = pinchDistanceOf(touches);
   }
 
   el.addEventListener('pointerdown', onDown);

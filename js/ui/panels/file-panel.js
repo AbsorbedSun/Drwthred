@@ -5,6 +5,7 @@
 // ============================================================================
 import { register } from '../hud-manager.js';
 import { downloadProject, pickAndLoadProject, exportImage } from '../../persistence/save-load.js';
+import { icon } from '../icons.js';
 
 export function createFilePanel({ id, slot, order, scene, strokeEngine, renderer, onToast }) {
   const wrap = document.createElement('div');
@@ -12,15 +13,15 @@ export function createFilePanel({ id, slot, order, scene, strokeEngine, renderer
 
   const trigger = document.createElement('button');
   trigger.className = 'hud-trigger';
-  trigger.textContent = '⤓';
+  trigger.innerHTML = icon('save');
   trigger.title = 'Guardar / Cargar / Exportar';
 
   const panel = document.createElement('div');
   panel.className = 'hud-panel-detail file-panel-detail';
   panel.innerHTML = `
-    <button class="file-action" data-action="save">⤓ Guardar proyecto</button>
-    <button class="file-action" data-action="load">⤒ Cargar proyecto</button>
-    <button class="file-action" data-action="export">▣ Exportar imagen</button>
+    <button class="file-action" data-action="save">${icon('save')}<span>Guardar proyecto</span></button>
+    <button class="file-action" data-action="load">${icon('load')}<span>Cargar proyecto</span></button>
+    <button class="file-action" data-action="export">${icon('image')}<span>Exportar imagen</span></button>
   `;
   wrap.append(trigger, panel);
 

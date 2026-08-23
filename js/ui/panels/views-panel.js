@@ -10,6 +10,7 @@
 import { register } from '../hud-manager.js';
 import { getState, subscribe } from '../../core/store.js';
 import { saveView, applyView, deleteView } from '../../core/views.js';
+import { icon } from '../icons.js';
 
 export function createViewsPanel({ id, slot, order, camCtl }) {
   const wrap = document.createElement('div');
@@ -17,7 +18,7 @@ export function createViewsPanel({ id, slot, order, camCtl }) {
 
   const trigger = document.createElement('button');
   trigger.className = 'hud-trigger';
-  trigger.textContent = '⛶';
+  trigger.innerHTML = icon('views');
   trigger.title = 'Vistas guardadas';
 
   const panel = document.createElement('div');
@@ -48,7 +49,7 @@ export function createViewsPanel({ id, slot, order, camCtl }) {
 
       const del = document.createElement('button');
       del.className = 'layer-eye';
-      del.textContent = '×';
+      del.innerHTML = icon('close');
       del.title = 'Borrar vista';
       del.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -69,7 +70,7 @@ export function createViewsPanel({ id, slot, order, camCtl }) {
 
     const addBtn = document.createElement('button');
     addBtn.className = 'layer-add-btn';
-    addBtn.textContent = '+ Guardar vista actual';
+    addBtn.innerHTML = icon('plus') + '<span>Guardar vista actual</span>';
     addBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       saveView(camCtl);

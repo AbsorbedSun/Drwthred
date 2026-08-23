@@ -10,7 +10,8 @@
 
 <canvas id="scene-canvas"></canvas>
 
-<main class="doc">
+<main class="doc" id="doc-panel">
+  <button class="doc-close" id="doc-close" title="Cerrar (esto es solo la explicación de la demo)">×</button>
   <h1>Sistema de HUD — prueba de concepto</h1>
   <p class="lede">
     Antes de tocar el motor de dibujo, esto prueba la pieza que existe para
@@ -48,26 +49,19 @@
   </section>
 
   <section>
-    <h2>Las cuatro herramientas de la rueda, todas funcionales</h2>
+    <h2>Cambios de esta ronda</h2>
     <ul>
-      <li><strong>Pincel</strong> — dibuja (como antes).</li>
-      <li><strong>Goma</strong> — <em>Borrado total</em> saca el trazo entero que toques; <em>Borrado parcial</em> corta solo el pedazo tocado (puede partir un trazo en dos).</li>
-      <li><strong>Figuras</strong> — tocar (sin arrastrar) coloca la primitiva elegida en ese punto.</li>
-      <li><strong>Selección</strong> — tocar resalta el trazo o figura tocada; tocar el vacío deselecciona.</li>
-    </ul>
-    <p>Las cuatro entran al mismo deshacer/rehacer sin que se haya tocado ese código —
-    <code>core/history.js</code> no sabe ni le importa qué herramienta generó cada acción.</p>
-    <ul>
-      <li><code>drawing/eraser.js</code> — borrado total y parcial. <code>node tests/eraser.test.js</code></li>
-      <li><code>drawing/primitives.js</code> — coloca formas. <code>node tests/primitives.test.js</code></li>
-      <li><code>drawing/selection.js</code> — hit-test + resaltado reactivo. <code>node tests/selection.test.js</code></li>
-      <li><code>input/tool-router.js</code> — la pieza que decide qué hace el gesto de 1 dedo según la herramienta activa. Antes de esto, 1 dedo siempre dibujaba, sin importar qué mostrara la rueda.</li>
+      <li><strong>Modo oscuro real</strong> — no solo el lienzo: los botones y paneles ahora responden a <code>prefers-color-scheme</code> del sistema, no un tema fijo.</li>
+      <li><strong>Íconos propios</strong> — <code>ui/icons.js</code> reemplaza todos los glifos Unicode sueltos por SVG con el mismo trazo y estilo en todos lados.</li>
+      <li><strong>Deshacer/Rehacer lado a lado</strong> — antes apilados verticalmente; ahora un solo grupo horizontal, sigue contando como un elemento para el anti-colisión del HUD.</li>
+      <li><strong>Panel de instrucciones cerrable</strong> — es documentación de la demo, no HUD real; ya no ocupa el centro de la pantalla para siempre.</li>
+      <li><strong>Lápiz con prioridad sobre el dedo</strong> — con un lápiz activo, dibuja siempre y los dedos quedan libres para navegar (orbitar/pan) al mismo tiempo, sin competir por el mismo gesto.</li>
     </ul>
     <p class="lede" style="font-size:13px">
-      179 aserciones automáticas en total entre los 11 módulos probados con
-      Node, más las pruebas de integración en Playwright de esta sección
-      (cambiar de herramienta en la rueda y confirmar que cada una hace lo
-      suyo, con capturas reales).
+      Verifiqué las 6 posiciones del HUD con números exactos (no a ojo):
+      las seis caen justo a 8px de su borde correspondiente, y la de
+      arriba-centro queda perfectamente centrada. El gesto combinado
+      lápiz+dedo se probó disparando ambos tipos de puntero a la vez.
     </p>
   </section>
 </main>

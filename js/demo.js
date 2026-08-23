@@ -1,24 +1,29 @@
 import { register } from './ui/hud-manager.js';
 import { toast } from './ui/toast.js';
+import { icon } from './ui/icons.js';
 import { createToolWheel } from './ui/panels/tool-wheel.js';
 import { createLayersPanel } from './ui/panels/layers-panel.js';
 import { setState } from './core/store.js';
 import { undo, redo, canUndo, canRedo, subscribeHistory } from './core/history.js';
 
-// ── Deshacer / rehacer — esquina arriba-derecha, libre desde que la rueda
-// se mudó a la izquierda. Categoría 1 (siempre visibles, sin panel: tocar
-// ejecuta la acción directo, no hay nada que desplegar).
+// ── Deshacer / rehacer — un solo grupo, lado a lado (no apilados verticalmente
+// como antes). Para el HUD manager sigue siendo UN elemento en el slot, así
+// que el anti-colisión no cambia — adentro del grupo el layout es propio.
+const undoRedoGroup = document.createElement('div');
+undoRedoGroup.className = 'hud-btn-group';
+
 const undoBtn = document.createElement('button');
 undoBtn.className = 'hud-fab';
-undoBtn.textContent = '↺';
+undoBtn.innerHTML = icon('undo');
 undoBtn.title = 'Deshacer';
-register({ id: 'undo-btn', slot: 'corner-top-right', order: 0, el: undoBtn });
 
 const redoBtn = document.createElement('button');
 redoBtn.className = 'hud-fab';
-redoBtn.textContent = '↻';
+redoBtn.innerHTML = icon('redo');
 redoBtn.title = 'Rehacer';
-register({ id: 'redo-btn', slot: 'corner-top-right', order: 1, el: redoBtn });
+
+undoRedoGroup.append(undoBtn, redoBtn);
+register({ id: 'undo-redo-group', slot: 'corner-top-right', order: 0, el: undoRedoGroup });
 
 function syncUndoRedoUI() {
   undoBtn.disabled = !canUndo();
@@ -42,39 +47,36 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ── Rueda radial de herramientas — pincel, goma, figuras, selección ──
-// Segmento pedido: cada botón despliega un submenú satélite con variantes.
 // Cada variante de pincel trae su propio color/ancho, para que el store
-// realmente cambie algo observable (antes solo lo mostraba en un toast).
+// realmente cambie algo observable.
 createToolWheel({
   id: 'tool-wheel',
   slot: 'corner-top-left',
   order: 0,
   tools: [
-    { id: 'brush', icon: '✎', label: 'Pincel', variants: [
-      { id: 'pencil', icon: '✎', label: 'Lápiz', brushColor: '#ffffff', brushWidth: 0.015 },
-      { id: 'marker', icon: '🖊', label: 'Marcador', brushColor: '#f4d35e', brushWidth: 0.05 },
-      { id: 'airbrush', icon: '💨', label: 'Aerógrafo', brushColor: '#e07a5f', brushWidth: 0.09 },
+    { id: 'brush', icon: icon('pencil'), label: 'Pincel', variants: [
+      { id: 'pencil', icon: icon('pencilThin'), label: 'Lápiz', brushColor: '#ffffff', brushWidth: 0.015 },
+      { id: 'marker', icon: icon('marker'), label: 'Marcador', brushColor: '#f4d35e', brushWidth: 0.05 },
+      { id: 'airbrush', icon: icon('airbrush'), label: 'Aerógrafo', brushColor: '#e07a5f', brushWidth: 0.09 },
     ]},
-    { id: 'eraser', icon: '⌫', label: 'Goma', variants: [
-      { id: 'erase-full', icon: '⬛', label: 'Borrado total' },
-      { id: 'erase-partial', icon: '◐', label: 'Borrado parcial' },
+    { id: 'eraser', icon: icon('eraser'), label: 'Goma', variants: [
+      { id: 'erase-full', icon: icon('eraseFull'), label: 'Borrado total' },
+      { id: 'erase-partial', icon: icon('erasePartial'), label: 'Borrado parcial' },
     ]},
-    { id: 'shapes', icon: '◆', label: 'Figuras', variants: [
-      { id: 'plane', icon: '▱', label: 'Plano' },
-      { id: 'cube', icon: '⬚', label: 'Cubo' },
-      { id: 'sphere', icon: '○', label: 'Esfera' },
-      { id: 'cylinder', icon: '⬭', label: 'Cilindro' },
-      { id: 'cone', icon: '▲', label: 'Cono' },
+    { id: 'shapes', icon: icon('shapes'), label: 'Figuras', variants: [
+      { id: 'plane', icon: icon('plane'), label: 'Plano' },
+      { id: 'cube', icon: icon('cube'), label: 'Cubo' },
+      { id: 'sphere', icon: icon('sphere'), label: 'Esfera' },
+      { id: 'cylinder', icon: icon('cylinder'), label: 'Cilindro' },
+      { id: 'cone', icon: icon('cone'), label: 'Cono' },
     ]},
-    { id: 'select', icon: '⬚', label: 'Selección', variants: [
-      { id: 'select-single', icon: '•', label: 'Individual' },
-      { id: 'select-lasso', icon: '◯', label: 'Lazo' },
+    { id: 'select', icon: icon('cursor'), label: 'Selección', variants: [
+      { id: 'select-single', icon: icon('selectSingle'), label: 'Individual' },
+      { id: 'select-lasso', icon: icon('selectLasso'), label: 'Lazo' },
     ]},
   ],
   onSelect: (toolId, variantId, variant) => {
     const patch = { activeTool: toolId, activeVariant: variantId };
-    // Solo las variantes de pincel traen color/ancho propios — las demás
-    // (goma, figuras, selección) no tocan esos campos del store todavía.
     if (variant.brushColor) patch.brushColor = variant.brushColor;
     if (variant.brushWidth) patch.brushWidth = variant.brushWidth;
     setState(patch);
@@ -82,23 +84,26 @@ createToolWheel({
   },
 });
 
-// ── Un segundo elemento REAL apilado debajo, en el mismo slot — sigue
-// probando el anti-colisión, ahora del lado izquierdo junto a la rueda.
+// ── Segundo elemento en el mismo slot que la rueda — sigue probando el
+// anti-colisión con un caso real, ahora con ícono en vez de emoji.
 const settingsBtn = document.createElement('button');
 settingsBtn.className = 'hud-fab';
-settingsBtn.textContent = '⚙';
-settingsBtn.title = 'Ajustes (placeholder) — mirá cómo se corre cuando la rueda se abre';
+settingsBtn.innerHTML = icon('gear');
+settingsBtn.title = 'Ajustes (placeholder)';
 register({ id: 'settings-fab', slot: 'corner-top-left', order: 1, el: settingsBtn });
 settingsBtn.addEventListener('click', () => toast('Acá iría el panel de ajustes'));
 
 // ── Panel de capas (categoría 2) — esquina abajo-izquierda ──
 createLayersPanel({ id: 'layers-panel', slot: 'corner-bottom-left', order: 0 });
 
-// (El panel contextual de ejemplo que vivía en esquina abajo-derecha ya
-// cumplió su función — probar que categoría 2 funcionaba. Ese lugar ahora
-// lo ocupa el panel de archivo real, ver scene-demo.js.)
-
 // ── Notificación transitoria (categoría 3) ──
 document.getElementById('toast-trigger').addEventListener('click', () => {
   toast('Guardado ✓');
+});
+
+// ── Cerrar el panel de instrucciones — es documentación de la demo, no
+// parte de la HUD real; no tiene sentido que ocupe el centro de la
+// pantalla para siempre.
+document.getElementById('doc-close').addEventListener('click', () => {
+  document.getElementById('doc-panel').classList.add('hidden');
 });

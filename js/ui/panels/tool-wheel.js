@@ -60,7 +60,7 @@ export function createToolWheel({ id, slot, order, tools, onSelect }) {
     active = { toolIdx, variantIdx };
     const tool = tools[toolIdx];
     const variant = tool.variants[variantIdx];
-    trigger.textContent = variant.icon || tool.icon;
+    trigger.innerHTML = variant.icon || tool.icon;
     trigger.title = `${tool.label} — ${variant.label}`;
     if (onSelect) onSelect(tool.id, variant.id, variant);
   }
@@ -110,7 +110,7 @@ export function createToolWheel({ id, slot, order, tools, onSelect }) {
     tool.variants.forEach((v, vi) => {
       const b = document.createElement('button');
       b.className = 'tool-wheel-variant';
-      b.textContent = v.icon || v.label[0];
+      b.innerHTML = v.icon || v.label[0];
       b.title = v.label;
       b.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -147,7 +147,7 @@ export function createToolWheel({ id, slot, order, tools, onSelect }) {
   tools.forEach((tool, i) => {
     const seg = document.createElement('button');
     seg.className = 'tool-wheel-seg';
-    seg.textContent = tool.icon;
+    seg.innerHTML = tool.icon;
     seg.title = tool.label;
     ring.appendChild(seg);
     // reposicionar cuando el wrap termina su transición de apertura
