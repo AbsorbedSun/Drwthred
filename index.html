@@ -49,19 +49,22 @@
   </section>
 
   <section>
-    <h2>Cambios de esta ronda</h2>
+    <h2>Mover, escalar y rotar — Figuras y Selección</h2>
+    <p>Colocá una figura (Figuras) o dibujá algo y tocalo (Selección) —
+    queda resaltado. <strong>Arrastrar con 1 dedo</strong> lo mueve.
+    <strong>Pellizcar con 2 dedos</strong> lo escala; <strong>girar los
+    2 dedos</strong> lo rota — sobre su propio eje, no sobre el origen
+    del mundo. Todo entra al mismo deshacer/rehacer.</p>
     <ul>
-      <li><strong>Modo oscuro real</strong> — no solo el lienzo: los botones y paneles ahora responden a <code>prefers-color-scheme</code> del sistema, no un tema fijo.</li>
-      <li><strong>Íconos propios</strong> — <code>ui/icons.js</code> reemplaza todos los glifos Unicode sueltos por SVG con el mismo trazo y estilo en todos lados.</li>
-      <li><strong>Deshacer/Rehacer lado a lado</strong> — antes apilados verticalmente; ahora un solo grupo horizontal, sigue contando como un elemento para el anti-colisión del HUD.</li>
-      <li><strong>Panel de instrucciones cerrable</strong> — es documentación de la demo, no HUD real; ya no ocupa el centro de la pantalla para siempre.</li>
-      <li><strong>Lápiz con prioridad sobre el dedo</strong> — con un lápiz activo, dibuja siempre y los dedos quedan libres para navegar (orbitar/pan) al mismo tiempo, sin competir por el mismo gesto.</li>
+      <li><code>drawing/transform.js</code> — mover/escalar/rotar en sí. <code>node tests/transform.test.js</code></li>
+      <li>Arreglé de paso un problema real: los trazos guardaban su geometría en coordenadas absolutas con el pivote siempre en (0,0,0) — escalar así los hacía "volar" desde el origen del mundo en vez de crecer sobre sí mismos. Ahora el pivote queda en el propio centroide del trazo.</li>
+      <li>Encontré y arreglé otro bug en el camino: el primer dedo de un gesto de 2 dedos, si no le pegaba a nada, deseleccionaba antes de que llegara el segundo dedo — <code>drawing/selection.js</code> separó el hit-test puro de la decisión de deseleccionar, que ahora se resuelve recién al soltar.</li>
     </ul>
     <p class="lede" style="font-size:13px">
-      Verifiqué las 6 posiciones del HUD con números exactos (no a ojo):
-      las seis caen justo a 8px de su borde correspondiente, y la de
-      arriba-centro queda perfectamente centrada. El gesto combinado
-      lápiz+dedo se probó disparando ambos tipos de puntero a la vez.
+      204 aserciones automáticas en total entre los 12 módulos probados
+      con Node, más las pruebas de integración en Playwright de esta
+      sección — incluida una prueba visual de rotación real (un cono
+      girando 90° sobre su propio eje, no sobre el mundo).
     </p>
   </section>
 </main>

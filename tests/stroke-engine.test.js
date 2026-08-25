@@ -63,5 +63,34 @@ assert(finishedStroke !== null, 'endStroke debe devolver el trazo terminado');
 assert(engine.finished.length === 1, 'el trazo terminado debe quedar registrado');
 assert(scene.children.length === 1, 'el mesh del trazo debe seguir en la escena tras terminarlo');
 
+// ── El pivote del mesh queda en el centroide del trazo, no en el origen
+// del mundo — necesario para poder escalar/rotar sobre el trazo mismo
+// más adelante, no que "vuele" desde (0,0,0). ──
+{
+  const scene2 = new THREE.Scene();
+  const camera2 = new THREE.PerspectiveCamera(50, 1, 0.01, 100);
+  camera2.position.copy(camPos);
+  const engine2 = createStrokeEngine(scene2, camera2);
+  const pA = new THREE.Vector3(10, 0, 0), pB = new THREE.Vector3(20, 0, 0);
+  engine2.startStroke(pA, { width: 0.03 });
+  engine2.addPoint(pB);
+  const done2 = engine2.endStroke();
+  const expectedCentroid = new THREE.Vector3().addVectors(pA, pB).multiplyScalar(0.5);
+  assert(approx(done2.mesh.position.x, expectedCentroid.x) && approx(done2.mesh.position.y, expectedCentroid.y),
+    `mesh.position debe quedar en el centroide (${expectedCentroid.x},${expectedCentroid.y}), quedó (${done2.mesh.position.x},${done2.mesh.position.y})`);
+  // El vértice más cercano a pA, medido en coordenadas LOCALES (relativas
+  // al pivote), no debe seguir en (10,0,0) absoluto — debe estar cerca de
+  // pA - centroide, confirmando que la geometría se corrió al centrar.
+  const localX = done2.mesh.geometry.attributes.position.getX(0);
+  assert(!approx(localX, 10, 1), `la geometría debe quedar relativa al centroide, no en coordenadas absolutas (x local=${localX})`);
+  // Pero el punto MUNDO (posición del mesh + vértice local) debe seguir
+  // coincidiendo con el trazo dibujado — nada se movió visualmente.
+  const worldX = done2.mesh.position.x + localX;
+  assert(approx(worldX, pA.x, 0.01) || approx(worldX, pB.x, 0.01), `el vértice en coordenadas de mundo debe seguir coincidiendo con el trazo original (x mundo=${worldX})`);
+  // userData.strokePoints tiene que seguir en coordenadas absolutas —
+  // de eso depende el guardado/carga, no debe cambiar con este fix.
+  assert(approx(done2.mesh.userData.strokePoints[0][0], 10), 'userData.strokePoints debe seguir siendo coordenadas absolutas del mundo');
+}
+
 console.log(`\n${pass} pasaron, ${fail} fallaron`);
 process.exit(fail > 0 ? 1 : 0);

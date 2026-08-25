@@ -68,8 +68,17 @@ export function erasePartial(scene, camera, ndcX, ndcY, radius = 0.12) {
     .filter((seg) => seg.length >= 2)
     .map((seg) => {
       const geo = buildRibbonGeometry(seg, width, camera.position);
+      // Mismo centrado de pivote que stroke-engine.js — un pedazo de
+      // trazo recién partido también tiene que poder escalarse/rotarse
+      // sobre sí mismo más adelante, no sobre el origen del mundo.
+      const centroid = new THREE.Vector3();
+      seg.forEach((p) => centroid.add(p));
+      centroid.divideScalar(seg.length);
+      geo.translate(-centroid.x, -centroid.y, -centroid.z);
+
       const mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
       const m = new THREE.Mesh(geo, mat);
+      m.position.copy(centroid);
       m.userData = {
         layerId,
         strokeWidth: width,

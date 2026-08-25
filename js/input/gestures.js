@@ -1,27 +1,25 @@
 // ============================================================================
 // GESTURES — traduce Pointer Events crudos (mouse/touch/lápiz, misma API)
-// en acciones semánticas sobre el controlador de cámara y el motor de
-// trazo. No sabe nada de Three.js: para dibujar, solo convierte a
-// coordenadas normalizadas de pantalla (NDC) y delega en los callbacks
-// `draw` que le pasen — la proyección a 3D es responsabilidad de
-// drawing/plane-projection.js, no de este módulo.
+// en acciones semánticas sobre el controlador de cámara, el motor de
+// trazo y la transformación del objeto seleccionado. No sabe nada de
+// Three.js: para dibujar, solo convierte a coordenadas normalizadas de
+// pantalla (NDC) y delega en los callbacks que le pasen.
 //
-// El lápiz (pointerType 'pen') es un canal aparte de los dedos, no un
-// puntero más en la cuenta: mientras esté activo, dibuja siempre y los
-// dedos quedan libres para navegar — "dibujar preferiblemente con lápiz
-// en vez de con un dedo", como se pidió. Sin lápiz de por medio, el
-// vocabulario de siempre sigue intacto:
+// El lápiz (pointerType 'pen') es un canal aparte de los dedos: mientras
+// esté activo, dibuja siempre y los dedos quedan libres para navegar.
+// Sin lápiz de por medio, el vocabulario de siempre:
 //   1 dedo  → dibujar/herramienta activa
-//   2 dedos → orbitar + pellizco = zoom
+//   2 dedos → orbitar + pellizco = zoom — SALVO que haya algo seleccionado
+//             con Selección/Figuras activo: ahí, 2 dedos escalan+rotan
+//             ese objeto en vez de mover la cámara (transform.isActive()
+//             decide, este módulo no sabe de selección, solo pregunta).
 //   3 dedos → pan
-// Con el lápiz activo, los dedos se corren un lugar (ya no hace falta
-// reservar el primero para dibujar):
-//   1 dedo  → orbitar + pellizco = zoom
-//   2 dedos → pan
+// Con el lápiz activo, los dedos se corren un lugar (1→orbit/transform, 2→pan).
 // ============================================================================
-export function attachGestures(el, camCtl, draw) {
+export function attachGestures(el, camCtl, draw, transform) {
   const pointers = new Map(); // pointerId -> {x, y, type}
   let penId = null;
+  let transforming = false;
 
   function nonPenPointers() {
     const out = [];
@@ -52,8 +50,6 @@ export function attachGestures(el, camCtl, draw) {
     try { el.setPointerCapture(e.pointerId); } catch (err) { /* no crítico */ }
 
     if (e.pointerType === 'pen' && penId === null) {
-      // Si algún dedo estaba dibujando a medio camino, se cierra en vez
-      // de perderse — el lápiz toma la posta de forma limpia.
       if (draw && draw.isDrawing()) draw.onEnd();
       penId = e.pointerId;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
@@ -68,14 +64,21 @@ export function attachGestures(el, camCtl, draw) {
     const hadOneTouch = nonPenPointers().length === 1;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
     const touches = nonPenPointers();
+    const orbitAt = penActive ? 1 : 2;
 
     if (!penActive && touches.length === 1 && draw) {
       const ndc = toNDC(e.clientX, e.clientY);
       draw.onStart(ndc.x, ndc.y);
     } else if (!penActive && hadOneTouch && draw && draw.isDrawing()) {
-      // pasamos de 1 a 2+ dedos con un trazo a medio hacer: se cierra,
-      // no se pierde, y arrancamos navegación en su lugar.
       draw.onEnd();
+    }
+
+    if (touches.length === orbitAt && transform && transform.isActive()) {
+      transform.startScaleRotate(touches);
+      transforming = true;
+    } else if (transforming) {
+      transform.endScaleRotate();
+      transforming = false;
     }
 
     lastCentroid = touches.length ? centroidOf(touches) : null;
@@ -105,10 +108,14 @@ export function attachGestures(el, camCtl, draw) {
       const ndc = toNDC(e.clientX, e.clientY);
       draw.onMove(ndc.x, ndc.y);
     } else if (touches.length === orbitAt) {
-      if (lastCentroid && c) camCtl.orbit(c.x - lastCentroid.x, c.y - lastCentroid.y);
-      const d = pinchDistanceOf(touches);
-      if (lastPinchDist) camCtl.zoom(lastPinchDist / d);
-      lastPinchDist = d;
+      if (transforming && transform) {
+        transform.updateScaleRotate(touches);
+      } else {
+        if (lastCentroid && c) camCtl.orbit(c.x - lastCentroid.x, c.y - lastCentroid.y);
+        const d = pinchDistanceOf(touches);
+        if (lastPinchDist) camCtl.zoom(lastPinchDist / d);
+        lastPinchDist = d;
+      }
     } else if (touches.length >= panAt) {
       if (lastCentroid && c) camCtl.pan(c.x - lastCentroid.x, c.y - lastCentroid.y);
     }
@@ -132,12 +139,18 @@ export function attachGestures(el, camCtl, draw) {
     const penActive = penId !== null;
     const wasOneTouch = nonPenPointers().length === 1;
     pointers.delete(e.pointerId);
+    const touches = nonPenPointers();
+    const orbitAt = (penId !== null) ? 1 : 2;
 
     if (!penActive && wasOneTouch && draw && draw.isDrawing()) {
       const ndc = toNDC(e.clientX, e.clientY);
       draw.onEnd(ndc.x, ndc.y);
     }
-    const touches = nonPenPointers();
+    if (transforming && touches.length !== orbitAt) {
+      transform.endScaleRotate();
+      transforming = false;
+    }
+
     lastCentroid = touches.length ? centroidOf(touches) : null;
     lastPinchDist = pinchDistanceOf(touches);
   }

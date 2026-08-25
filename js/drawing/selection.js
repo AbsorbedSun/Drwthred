@@ -19,11 +19,20 @@ function selectableMeshes(scene) {
   return scene.children.filter((o) => o.userData && (o.userData.strokePoints || o.userData.primitiveKind));
 }
 
-export function selectAt(scene, camera, ndcX, ndcY) {
+/** Hit-test puro, sin efectos secundarios — no toca el store. Separado
+ * de selectAt() a propósito: el enrutador de herramientas necesita saber
+ * QUÉ se tocó sin decidir todavía si eso implica cambiar la selección
+ * (podría ser el primer dedo de un gesto de 2 dedos, ver tool-router.js). */
+export function hitTestAt(scene, camera, ndcX, ndcY) {
   raycaster.setFromCamera({ x: ndcX, y: ndcY }, camera);
   const hits = raycaster.intersectObjects(selectableMeshes(scene), false);
-  setState({ selectedId: hits.length ? hits[0].object.uuid : null });
   return hits.length ? hits[0].object.uuid : null;
+}
+
+export function selectAt(scene, camera, ndcX, ndcY) {
+  const id = hitTestAt(scene, camera, ndcX, ndcY);
+  setState({ selectedId: id });
+  return id;
 }
 
 export function clearSelection() {

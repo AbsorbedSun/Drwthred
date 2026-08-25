@@ -107,7 +107,14 @@ code{font-family:'DM Mono',monospace;font-size:.9em;background:var(--bdr);paddin
 
 .hud-btn-group{display:flex;gap:6px}
 
-.hud-context-panel{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+/* El wrapper ya NO es un contenedor flex que apila disparador+panel — eso
+   era el bug: aunque el panel estuviera invisible (opacity:0), seguía
+   ocupando espacio en el layout, empujando al disparador lejos de su
+   esquina en los slots anclados por "bottom" (arriba no se notaba, por
+   pura coincidencia con cómo cae el anclaje). Ahora el wrapper mide
+   exactamente lo que mide el disparador — el panel se posiciona
+   "position:absolute" encima, sin afectar el tamaño de nadie. */
+.hud-context-panel{position:relative;display:inline-block}
 .hud-trigger{
   width:var(--touch-min);
   height:var(--touch-min);
@@ -121,6 +128,7 @@ code{font-family:'DM Mono',monospace;font-size:.9em;background:var(--bdr);paddin
   transition:background .15s ease, color .15s ease;
 }
 .hud-panel-detail{
+  position:absolute;
   width:220px;
   background:var(--pan);
   border:1px solid var(--bdr);
@@ -130,18 +138,22 @@ code{font-family:'DM Mono',monospace;font-size:.9em;background:var(--bdr);paddin
   line-height:1.5;
   box-shadow:0 4px 16px rgba(0,0,0,.08);
   opacity:0;
-  transform:translateY(-6px) scale(.97);
-  transform-origin:top right;
   pointer-events:none;
   transition:opacity .15s ease, transform .15s ease;
 }
-.hud-context-panel.open .hud-panel-detail{
-  opacity:1;
-  transform:translateY(0) scale(1);
-  pointer-events:auto;
-}
 .hud-panel-detail p{margin:0 0 6px}
 .hud-panel-detail p:last-child{margin-bottom:0;color:var(--mut)}
+
+/* Cada panel abre hacia el lado libre de pantalla según su esquina —
+   mismo criterio que ya usa la rueda de herramientas para su arco. */
+.layers-panel .hud-panel-detail{left:0;bottom:calc(100% + 6px);transform:translateY(4px) scale(.97);transform-origin:bottom left}
+.layers-panel.open .hud-panel-detail{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
+
+.file-panel .hud-panel-detail{right:0;bottom:calc(100% + 6px);transform:translateY(4px) scale(.97);transform-origin:bottom right}
+.file-panel.open .hud-panel-detail{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
+
+.views-panel .hud-panel-detail{left:50%;top:calc(100% + 6px);transform:translateX(-50%) translateY(-4px) scale(.97);transform-origin:top center}
+.views-panel.open .hud-panel-detail{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0) scale(1)}
 
 .hud-toast{
   background:var(--ink);

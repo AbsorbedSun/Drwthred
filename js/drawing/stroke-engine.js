@@ -88,6 +88,20 @@ export function createStrokeEngine(scene, camera) {
     const done = current;
     current = null;
     if (done && done.mesh) {
+      // Centrar el pivote en el propio centroide del trazo — hasta acá
+      // la geometría se construía en coordenadas absolutas del mundo con
+      // mesh.position siempre en (0,0,0). Eso funciona para dibujar, pero
+      // escalar o rotar así saldría disparado desde el origen del mundo
+      // en vez de girar sobre el trazo mismo. Centrar la GEOMETRÍA y
+      // mover el mesh.position al centroide arregla eso sin tocar
+      // userData.strokePoints (que sigue guardando coordenadas absolutas
+      // — de eso depende el guardado/carga, no debe cambiar).
+      const centroid = new THREE.Vector3();
+      done.points.forEach((p) => centroid.add(p));
+      centroid.divideScalar(done.points.length);
+      done.mesh.geometry.translate(-centroid.x, -centroid.y, -centroid.z);
+      done.mesh.position.copy(centroid);
+
       // Se completa acá, no en cada punto mientras se dibuja — hasta que
       // no termina el trazo no hace falta que sea serializable. Guardar
       // esto en userData (en vez de solo en `finished`) es lo que permite
