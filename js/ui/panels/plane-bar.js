@@ -29,10 +29,11 @@ const MODES = [
   { id: 'front', icon: 'planeFront', label: PLANE_PRESETS.front.label },
   { id: 'side', icon: 'planeSide', label: PLANE_PRESETS.side.label },
   { id: 'ground', icon: 'planeGround', label: PLANE_PRESETS.ground.label },
+  { id: 'surface', icon: 'surface', label: 'Superficie' },
   { id: 'custom', icon: 'planeCustom', label: 'Propio' },
 ];
 
-export function createPlaneBar({ id = 'plane-bar', order = 1, camCtl, camera, onToast }) {
+export function createPlaneBar({ id = 'plane-bar', order = 1, camCtl, camera, scene, onToast }) {
   const bar = document.createElement('div');
   bar.className = 'hud-planebar';
 
@@ -43,7 +44,8 @@ export function createPlaneBar({ id = 'plane-bar', order = 1, camCtl, camera, on
     const b = document.createElement('button');
     b.className = `plane-btn plane-${m.id}`;
     b.dataset.mode = m.id;
-    b.title = m.id === 'view' ? 'Plano libre (de frente a la cámara)' : `Plano ${m.label}`;
+    b.title = m.id === 'view' ? 'Plano libre (de frente a la cámara)'
+      : m.id === 'surface' ? 'Dibujar sobre la superficie de las figuras' : `Plano ${m.label}`;
     b.innerHTML = `${icon(m.icon)}<span class="plane-label">${m.label}</span>`;
     b.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -56,7 +58,10 @@ export function createPlaneBar({ id = 'plane-bar', order = 1, camCtl, camera, on
         } else alignView();
         return;
       }
-      if (cur.mode === m.id && m.id !== 'view') { alignView(); return; }
+      if (cur.mode === m.id && m.id !== 'view' && m.id !== 'surface') { alignView(); return; }
+      if (m.id === 'surface' && cur.mode !== 'surface' && !scene.children.some((o) => o.userData.primitiveKind && o.visible)) {
+        onToast && onToast('Superficie: agregá una figura y dibujá encima de ella');
+      }
       setPlaneMode(m.id, { target: camCtl.state.target });
     });
     modeBtns.set(m.id, b);

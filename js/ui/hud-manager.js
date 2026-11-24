@@ -128,7 +128,10 @@ export function relayout(slot) {
 }
 
 function entriesOf(slot) {
-  return [...registry.values()].filter((e) => e.slot === slot).sort((a, b) => a.order - b.order);
+  // Los elementos ocultos (display:none → tamaño 0) no ocupan lugar ni separación
+  return [...registry.values()]
+    .filter((e) => e.slot === slot && e.el.offsetWidth > 0)
+    .sort((a, b) => a.order - b.order);
 }
 
 function layoutSlot(slot) {

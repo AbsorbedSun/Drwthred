@@ -6,7 +6,7 @@
 // ============================================================================
 import { icon } from './icons.js';
 
-const SEEN_KEY = 'drwthred.helpSeen.v2';
+const SEEN_KEY = 'drwthred.helpSeen.v3'; // v3: se vuelve a mostrar una vez con lo nuevo
 
 const HTML = `
   <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="help-title">
@@ -49,8 +49,17 @@ const HTML = `
         <ul>
           <li>Tocar el plano activo otra vez: verlo de frente</li>
           <li>Arrastrar el chip <b>‹ ›</b>: alejar/acercar el plano</li>
-          <li>Herramienta <b>Plano</b>: arrastrá para moverlo, o tocá un trazo para llevarlo ahí</li>
+          <li>Herramienta <b>Plano → Mover</b>: arrastrá para desplazarlo; <b>→ Girar</b>: arrastrá para rotarlo (se imanta a los ejes)</li>
+          <li><b>Superficie</b>: el trazo se pega a las figuras que tenga debajo</li>
           <li><b>Espejo</b>: simetría en X</li>
+        </ul>
+      </section>
+      <section>
+        <h2>Selección</h2>
+        <ul>
+          <li><b>Selección → Lazo</b>: rodeá varios trazos y figuras</li>
+          <li>Arrastrá algo seleccionado para mover todo el grupo; 2 dedos lo escalan y rotan</li>
+          <li>La barra de arriba: duplicar, pintar, espejar, cambiar de capa, eliminar</li>
         </ul>
       </section>
     </div>

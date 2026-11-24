@@ -7,7 +7,10 @@
 //   'view'   → plano libre de frente a la cámara, que pasa por el punto
 //              de anclaje (el objetivo de la cámara o lo que se toque).
 //   'front' / 'side' / 'ground' → planos fijos XY / YZ / XZ del mundo.
-//   'custom' → plano fijo con normal arbitraria (capturado desde la vista).
+//   'custom' → plano fijo con normal arbitraria (capturado desde la vista,
+//              o girado con la herramienta Plano → Girar).
+//   'surface'→ sin plano: el trazo se pega a la superficie de las figuras
+//              que tenga debajo (si no hay figura, cae al plano libre).
 //
 // Un plano fijo es `normal · p = offset`. Cambiar el plano NO entra al
 // historial de deshacer: igual que mover la cámara, es una herramienta de
@@ -36,7 +39,10 @@ export function normalOf(spec) {
 }
 
 export function isFixedPlane(spec) {
-  return spec.mode !== 'view';
+  return spec.mode !== 'view' && spec.mode !== 'surface';
+}
+export function isSurfaceMode(spec) {
+  return spec.mode === 'surface';
 }
 
 /**
@@ -71,7 +77,7 @@ export function facingFactor(spec, camera) {
 /** Cambia de plano. Los presets pasan por `target` (donde se está mirando). */
 export function setPlaneMode(mode, { target } = {}) {
   const cur = getState().drawPlane;
-  if (mode === 'view') { setState({ drawPlane: { ...cur, mode: 'view' } }); return; }
+  if (mode === 'view' || mode === 'surface') { setState({ drawPlane: { ...cur, mode } }); return; }
   const preset = PLANE_PRESETS[mode];
   if (!preset) throw new Error(`[draw-planes] Plano desconocido: "${mode}"`);
   const normal = preset.normal.slice();
@@ -100,6 +106,43 @@ export function planeThroughPoint(point, camera) {
   const cur = getState().drawPlane;
   if (!isFixedPlane(cur)) { captureViewPlane(camera, point); return; }
   setPlaneOffset(normalOf(cur).dot(point));
+}
+
+// ── Girar el plano ──
+const AXES = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map((a) => new THREE.Vector3().fromArray(a));
+const SNAP_RAD = THREE.MathUtils.degToRad(4);
+
+/**
+ * Normal resultante de girar `normal` con el cuaternión `q`, imantada a un
+ * eje del mundo (±X/±Y/±Z) si queda a menos de 4°: es fácil volver a un
+ * plano "limpio" sin tener que acertar el ángulo exacto con el dedo.
+ */
+export function rotatedNormal(normal, q) {
+  const n = normal.clone().applyQuaternion(q).normalize();
+  for (const a of AXES) {
+    const d = n.dot(a);
+    if (Math.acos(Math.min(1, Math.abs(d))) < SNAP_RAD) return { normal: a.clone().multiplyScalar(Math.sign(d)), snapped: true };
+  }
+  return { normal: n, snapped: false };
+}
+
+/**
+ * Gira el plano alrededor de `pivot` (un punto del plano, normalmente su
+ * centro visible). El pivote queda quieto: el plano "pivotea" donde se lo
+ * ve, no alrededor del origen del mundo. Siempre deja un plano 'custom'
+ * (o el preset que corresponda si quedó alineado a un eje).
+ */
+export function setPlaneOrientation(normal, pivot) {
+  const n = normal.clone().normalize();
+  const offset = snapOffset(n.dot(pivot), 1e-4);
+  // ¿Quedó exactamente sobre un eje? Entonces es un preset (con su color y nombre)
+  const preset = Object.entries(PLANE_PRESETS).find(([, p]) => Math.abs(new THREE.Vector3().fromArray(p.normal).dot(n)) > 0.99999);
+  if (preset) {
+    const pn = new THREE.Vector3().fromArray(preset[1].normal);
+    setState({ drawPlane: { mode: preset[0], normal: preset[1].normal.slice(), offset: snapOffset(pn.dot(pivot), 1e-4) } });
+    return;
+  }
+  setState({ drawPlane: { mode: 'custom', normal: n.toArray().map((v) => +v.toFixed(6)), offset } });
 }
 
 export function toggleMirror() {

@@ -11,20 +11,26 @@
 //            el plano pasa por ese punto (dibujar "pegado" a lo que ya hay).
 //            Presión del lápiz → grosor; suavizado configurable; espejo.
 //   eraser → borrado total/parcial.
-//   select / shapes → tocar algo lo selecciona y arrastrarlo lo mueve;
+//            En modo Superficie, cada punto se pega a la figura de abajo.
+//   select / shapes → tocar algo lo selecciona y arrastrarlo lo mueve
+//            (si es parte de una selección múltiple, mueve todo el grupo);
 //            con Figuras, tocar el vacío coloca una primitiva sobre el plano.
-//   plane  → arrastrar mueve el plano activo a lo largo de su normal;
-//            tocar un trazo/figura lleva el plano hasta ese punto.
+//            Selección → Lazo: rodear objetos para seleccionarlos juntos.
+//   plane  → Mover: arrastrar desplaza el plano a lo largo de su normal;
+//            Girar: arrastrar lo rota sobre su centro (imantado a los ejes).
+//            Tocar un trazo/figura lleva el plano hasta ese punto.
 // ============================================================================
 import { getState, setState } from '../core/store.js';
 import { projectToPlane } from '../drawing/plane-projection.js';
 import {
-  resolvePlane, isFixedPlane, normalOf, planeCenter, facingFactor,
+  resolvePlane, isFixedPlane, isSurfaceMode, normalOf, planeCenter, facingFactor,
   setPlaneOffset, planeThroughPoint, captureViewPlane, mirrorPoint, mirrorNormal,
+  rotatedNormal, setPlaneOrientation,
 } from '../drawing/draw-planes.js';
+import { planeFacingCamera } from '../drawing/plane-projection.js';
 import { eraseFull, erasePartial, createEraseBatch } from '../drawing/eraser.js';
 import { placePrimitive } from '../drawing/primitives.js';
-import { hitTestAt, hitPointAt } from '../drawing/selection.js';
+import { hitTestAt, hitPointAt, surfaceHitAt, getSelectedIds, setSelection, objectsInLasso } from '../drawing/selection.js';
 import { pushAction } from '../core/history.js';
 import { getBrush } from '../drawing/brushes.js';
 import * as THREE from '../vendor/three.module.js';
@@ -39,7 +45,7 @@ export function pressureFactor(pressure, enabled = true) {
   return Math.min(1.7, Math.max(0.15, 0.15 + 1.7 * pressure)); // 0.5 ≈ grosor nominal
 }
 
-export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEngine = null, transform, onNotice = null }) {
+export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEngine = null, transform, onNotice = null, onLasso = null }) {
   let mode = null;
   let active = false;
   let drawPlane = null;
@@ -49,6 +55,10 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
   let planeDrag = null;   // { startOffset, axis, len2, hitPoint }
   let usedMirror = false;
   let eraseBatch = null;  // una pasada de goma = un solo paso de deshacer
+  let surface = null;     // modo Superficie: { lift, fallback: Plane }
+  let lasso = null;       // contorno del lazo en NDC
+  let planeRot = null;    // { startSpec, n0, pivot }
+  let dropped = 0;        // puntos descartados por caer demasiado lejos (plano casi de canto)
 
   function isDrawing() {
     return active;
@@ -85,25 +95,39 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
         return;
       }
       let anchor = camCtl.state.target;
-      if (!isFixedPlane(spec)) {
-        const hp = hitPointAt(scene, camera, ndcX, ndcY);
-        if (hp) anchor = hp;
+      let first = null; // { p, n } en modo Superficie
+      if (isSurfaceMode(spec)) {
+        const hit = surfaceHitAt(scene, camera, ndcX, ndcY);
+        if (hit) anchor = hit.point;
+        // Si el trazo sale de la figura, sigue en un plano de frente a la
+        // cámara a la profundidad del último punto de superficie.
+        surface = { lift: brushWidth * 0.4, fallback: planeFacingCamera(camera, anchor) };
+        drawPlane = surface.fallback;
+        first = hit ? { p: hit.point.addScaledVector(hit.normal, surface.lift), n: hit.normal } : null;
+      } else {
+        if (!isFixedPlane(spec)) {
+          const hp = hitPointAt(scene, camera, ndcX, ndcY);
+          if (hp) anchor = hp;
+        }
+        drawPlane = resolvePlane(spec, camera, anchor);
       }
-      drawPlane = resolvePlane(spec, camera, anchor);
       const faceNormal = isFixedPlane(spec) ? drawPlane.normal.clone() : null;
       smooth = { x: ndcX, y: ndcY };
-      const p = projectSafe(ndcX, ndcY);
+      const p = first ? first.p : projectSafe(ndcX, ndcY);
       if (!p) { mode = 'blocked'; return; }
       const brush = getBrush(activeVariant);
-      const nib = brush.nib ? nibAxis(drawPlane.normal) : null;
+      const nib = brush.nib ? nibAxis(first ? first.n : drawPlane.normal) : null;
       const opts = {
         color: brushColor, width: brushWidth, meta: { layerId: activeLayerId },
         pressure: pressureFactor(pressure, st.pressure), faceNormal, brush, nib,
+        smooth: true, normal: first ? first.n : null,
       };
       strokeEngine.startStroke(p, opts);
       usedMirror = !!(st.mirror && mirrorEngine);
       if (usedMirror) {
-        mirrorEngine.startStroke(mirrorPoint(p), { ...opts, faceNormal: mirrorNormal(faceNormal), nib: mirrorNormal(nib) });
+        mirrorEngine.startStroke(mirrorPoint(p), {
+          ...opts, faceNormal: mirrorNormal(faceNormal), nib: mirrorNormal(nib), normal: mirrorNormal(opts.normal),
+        });
       }
     } else if (activeTool === 'eraser') {
       eraseBatch = createEraseBatch(scene);
@@ -113,12 +137,23 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
       // arranca a moverlo. Si el toque cae en el vacío, la decisión se
       // resuelve recién en onEnd (podría ser el arranque de otro gesto).
       const hitId = hitTestAt(scene, camera, ndcX, ndcY);
-      if (hitId) {
-        setState({ selectedId: hitId });
+      const inSelection = hitId && getSelectedIds().includes(hitId);
+      const isLasso = activeTool === 'select' && activeVariant === 'select-lasso';
+      // Con el lazo es normal empezar a rodear desde ENCIMA de algo: solo
+      // arrastrar algo ya seleccionado mueve; lo demás dibuja el lazo.
+      if (hitId && (!isLasso || inSelection)) {
+        // Tocar algo que ya es parte de una selección múltiple mueve todo el grupo
+        if (!inSelection) setSelection([hitId]);
         if (transform && transform.startMove(ndcX, ndcY)) mode = 'moving';
+      } else if (isLasso) {
+        mode = 'lasso';
+        lasso = [{ x: ndcX, y: ndcY }];
+        if (onLasso) onLasso(lasso);
       }
     } else if (activeTool === 'plane') {
-      startPlaneDrag(ndcX, ndcY);
+      if (activeVariant === 'plane-rotate') startPlaneRotate(ndcX, ndcY);
+      else startPlaneDrag(ndcX, ndcY);
+      mode = 'plane';
     }
   }
 
@@ -133,6 +168,25 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
     const nib = right.add(up);
     nib.addScaledVector(planeNormal, -nib.dot(planeNormal));
     return nib.lengthSq() > 1e-8 ? nib.normalize() : new THREE.Vector3(1, 0, 0);
+  }
+
+  function startPlaneRotate(ndcX, ndcY) {
+    const hitPoint = hitPointAt(scene, camera, ndcX, ndcY);
+    if (!isFixedPlane(getState().drawPlane)) captureViewPlane(camera, hitPoint || camCtl.state.target);
+    const spec = getState().drawPlane;
+    planeRot = { startSpec: spec, n0: normalOf(spec), pivot: planeCenter(spec, camCtl.state.target), hitPoint };
+  }
+
+  function updatePlaneRotate(ndcX, ndcY) {
+    // Arrastre horizontal = girar alrededor del "arriba" de la cámara;
+    // vertical = alrededor de su "derecha". Media pantalla ≈ 90°.
+    const dx = (ndcX - downNdc.x) * camera.aspect, dy = ndcY - downNdc.y;
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    const q = new THREE.Quaternion().setFromAxisAngle(up, dx * Math.PI / 2)
+      .premultiply(new THREE.Quaternion().setFromAxisAngle(right, -dy * Math.PI / 2));
+    const { normal } = rotatedNormal(planeRot.n0, q);
+    setPlaneOrientation(normal, planeRot.pivot);
   }
 
   function startPlaneDrag(ndcX, ndcY) {
@@ -158,15 +212,34 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
     else eraseFull(scene, camera, ndcX, ndcY, { batch: eraseBatch });
   }
 
+  /** Modo Superficie: punto (y normal) sobre la figura de abajo, o sobre el plano de respaldo. */
+  function surfacePoint(x, y) {
+    const hit = surfaceHitAt(scene, camera, x, y);
+    if (hit) {
+      surface.fallback = planeFacingCamera(camera, hit.point);
+      drawPlane = surface.fallback;
+      return { p: hit.point.addScaledVector(hit.normal, surface.lift), n: hit.normal };
+    }
+    const p = projectSafe(x, y);
+    return p ? { p, n: null } : null;
+  }
+
   function addBrushPoint(ndcX, ndcY, pressure, raw = false) {
     const k = raw ? 0 : Math.min(0.85, Math.max(0, getState().smoothing || 0));
     smooth.x += (ndcX - smooth.x) * (1 - k);
     smooth.y += (ndcY - smooth.y) * (1 - k);
-    const p = projectSafe(smooth.x, smooth.y);
-    if (!p) return;
+    let p, n = null;
+    if (surface) {
+      const sp = surfacePoint(smooth.x, smooth.y);
+      if (!sp) return;
+      ({ p, n } = sp);
+    } else {
+      p = projectSafe(smooth.x, smooth.y);
+      if (!p) { dropped++; return; }
+    }
     const pf = pressureFactor(pressure, getState().pressure);
-    strokeEngine.addPoint(p, pf);
-    if (usedMirror) mirrorEngine.addPoint(mirrorPoint(p), pf);
+    strokeEngine.addPoint(p, pf, n);
+    if (usedMirror) mirrorEngine.addPoint(mirrorPoint(p), pf, mirrorNormal(n));
   }
 
   function onMove(ndcX, ndcY, pressure = null) {
@@ -181,6 +254,14 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
       eraseAt(ndcX, ndcY, getState().activeVariant);
     } else if (mode === 'moving' && transform) {
       transform.moveTo(ndcX, ndcY);
+    } else if (mode === 'lasso') {
+      const last = lasso[lasso.length - 1];
+      if (Math.hypot(ndcX - last.x, ndcY - last.y) > 0.006) {
+        lasso.push({ x: ndcX, y: ndcY });
+        if (onLasso) onLasso(lasso);
+      }
+    } else if (mode === 'plane' && planeRot && maxMove >= TAP_THRESHOLD) {
+      updatePlaneRotate(ndcX, ndcY);
     } else if (mode === 'plane' && planeDrag && maxMove >= TAP_THRESHOLD) {
       const dx = ndcX - downNdc.x, dy = ndcY - downNdc.y;
       const delta = planeDrag.len2 > 1e-4
@@ -195,6 +276,10 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
     const doneMirror = usedMirror ? mirrorEngine.endStroke() : null;
     drawPlane = null;
     const meshes = [done, doneMirror].filter((d) => d && d.mesh).map((d) => d.mesh);
+    if (!meshes.length && dropped > 0 && onNotice) {
+      // Antes no pasaba nada y no se entendía por qué
+      onNotice('Esa zona del plano queda muy lejos (casi de canto) — girá la vista o el plano');
+    }
     if (meshes.length) {
       pushAction({
         undo: () => meshes.forEach((m) => scene.remove(m)),
@@ -215,9 +300,18 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
       finishBrush();
     } else if (mode === 'moving' && transform) {
       transform.endMove();
+    } else if (mode === 'lasso') {
+      if (onLasso) onLasso(null);
+      if (isTap || lasso.length < 3) {
+        setSelection([]);
+      } else {
+        const found = objectsInLasso(scene, camera, lasso);
+        setSelection(found.map((o) => o.uuid));
+        if (onNotice) onNotice(found.length ? `${found.length} ${found.length === 1 ? 'objeto seleccionado' : 'objetos seleccionados'}` : 'El lazo no rodeó nada');
+      }
     } else if (mode === 'select' && isTap) {
       // Toque real que no le pegó a nada — recién acá deselecciona.
-      setState({ selectedId: null });
+      setSelection([]);
     } else if (mode === 'shapes' && isTap) {
       const { activeVariant, activeLayerId, drawPlane: spec, brushColor } = getState();
       const plane = resolvePlane(spec, camera, camCtl.state.target);
@@ -225,10 +319,11 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
       if (p && p.distanceTo(camera.position) < MAX_PROJECT_DIST) {
         const color = brushColor && brushColor.toLowerCase() !== '#ffffff' ? brushColor : undefined;
         const mesh = placePrimitive(scene, activeVariant, p, { layerId: activeLayerId, color });
-        setState({ selectedId: mesh.uuid }); // lista para mover/escalar/rotar ya mismo
+        setSelection([mesh.uuid]); // lista para mover/escalar/rotar ya mismo
       }
-    } else if (mode === 'plane' && planeDrag) {
-      if (isTap && planeDrag.hitPoint) planeThroughPoint(planeDrag.hitPoint, camera);
+    } else if (mode === 'plane') {
+      const hp = planeDrag ? planeDrag.hitPoint : planeRot && planeRot.hitPoint;
+      if (isTap && hp) planeThroughPoint(hp, camera);
     }
     reset();
   }
@@ -244,6 +339,10 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
       transform.cancelMove();
     } else if (mode === 'plane' && planeDrag) {
       setPlaneOffset(planeDrag.startOffset);
+    } else if (mode === 'plane' && planeRot) {
+      setState({ drawPlane: planeRot.startSpec });
+    } else if (mode === 'lasso' && onLasso) {
+      onLasso(null);
     }
     reset();
   }
@@ -262,6 +361,10 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
     drawPlane = null;
     usedMirror = false;
     eraseBatch = null;
+    surface = null;
+    lasso = null;
+    planeRot = null;
+    dropped = 0;
   }
 
   return { isDrawing, onStart, onMove, onEnd, cancel, isTrivial };

@@ -107,6 +107,7 @@ export function erasePartial(scene, camera, ndcX, ndcY, radius = 0.12, { batch =
   const faceNormal = faceArr ? new THREE.Vector3().fromArray(faceArr) : null;
   const brush = ud.brush ? getBrush(ud.brush) : null;
   const nib = ud.strokeNib ? new THREE.Vector3().fromArray(ud.strokeNib) : null;
+  const normalsArr = ud.strokeNormals || null;
 
   // Tramos contiguos (por índice, para arrastrar la presión) FUERA del radio
   const segments = [];
@@ -129,7 +130,9 @@ export function erasePartial(scene, camera, ndcX, ndcY, radius = 0.12, { batch =
     .map((idx) => {
       const seg = idx.map((i) => rawPoints[i]);
       const segPressures = pressures ? idx.map((i) => pressures[i]) : null;
-      const geo = buildRibbonGeometry(seg, ud.strokeWidth, camOriginal, { widths: segPressures, faceNormal, brush, nib });
+      const segNormalsArr = normalsArr ? idx.map((i) => normalsArr[i]) : null;
+      const segNormals = segNormalsArr ? segNormalsArr.map((n) => (n ? new THREE.Vector3().fromArray(n) : null)) : null;
+      const geo = buildRibbonGeometry(seg, ud.strokeWidth, camOriginal, { widths: segPressures, faceNormal, brush, nib, normals: segNormals });
       const cs = centroidOf(seg);
       geo.translate(-cs.x, -cs.y, -cs.z);
 
@@ -148,6 +151,7 @@ export function erasePartial(scene, camera, ndcX, ndcY, radius = 0.12, { batch =
       };
       if (ud.brush) m.userData.brush = ud.brush;
       if (ud.strokeNib) m.userData.strokeNib = ud.strokeNib.slice();
+      if (segNormalsArr) m.userData.strokeNormals = segNormalsArr;
       if (segPressures) m.userData.strokePressures = segPressures;
       if (faceArr) m.userData.strokeFaceNormal = faceArr.slice();
       return m;

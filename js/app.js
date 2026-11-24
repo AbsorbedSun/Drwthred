@@ -22,7 +22,8 @@ import { attachGestures } from './input/gestures.js';
 import { createToolRouter } from './input/tool-router.js';
 import { createStrokeEngine } from './drawing/stroke-engine.js';
 import { syncLayerVisibility } from './drawing/layers.js';
-import { syncSelectionHighlight } from './drawing/selection.js';
+import { syncSelectionHighlight, selectedObjects, setSelection } from './drawing/selection.js';
+import { duplicateObjects, deleteObjects } from './drawing/object-actions.js';
 import { createTransformController } from './drawing/transform.js';
 import { createPlaneGuide } from './drawing/plane-guide.js';
 import { BRUSHES } from './drawing/brushes.js';
@@ -32,6 +33,7 @@ import { icon } from './ui/icons.js';
 import { createToolbar } from './ui/panels/toolbar.js';
 import { createSizeSlider } from './ui/panels/size-slider.js';
 import { createPlaneBar } from './ui/panels/plane-bar.js';
+import { createSelectionBar } from './ui/panels/selection-bar.js';
 import { createNavGizmo } from './ui/panels/nav-gizmo.js';
 import { createLayersPanel } from './ui/panels/layers-panel.js';
 import { createViewsPanel } from './ui/panels/views-panel.js';
@@ -52,9 +54,23 @@ syncSelectionHighlight(scene);
 const transform = createTransformController({ scene, camera });
 
 // ── Entrada ──
+// Contorno del lazo: una capa SVG encima del lienzo (el router solo
+// informa los puntos en NDC; acá se dibujan en píxeles)
+const lassoSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+lassoSvg.classList.add('lasso-overlay');
+lassoSvg.innerHTML = '<polyline points=""/>';
+document.body.appendChild(lassoSvg);
+function drawLasso(path) {
+  const line = lassoSvg.firstChild;
+  if (!path) { line.setAttribute('points', ''); return; }
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  line.setAttribute('points', path.map((p) => `${((p.x + 1) / 2) * w},${((1 - p.y) / 2) * h}`).join(' '));
+}
+
 const toolRouter = createToolRouter({
   scene, camera, camCtl, strokeEngine, mirrorEngine, transform,
   onNotice: (msg) => toast(msg),
+  onLasso: drawLasso,
 });
 
 function doUndo() { if (undo()) toast('Deshecho'); else toast('Nada para deshacer'); }
@@ -121,8 +137,9 @@ createToolbar({
       { id: 'erase-full', icon: icon('eraseFull'), label: 'Borrar trazo entero' },
       { id: 'erase-partial', icon: icon('erasePartial'), label: 'Borrar una parte' },
     ]},
-    { id: 'select', icon: icon('cursor'), label: 'Selección', variants: [
-      { id: 'select-single', icon: icon('cursor'), label: 'Seleccionar y mover' },
+    { id: 'select', icon: icon('cursor'), label: 'Selección', showVariant: true, variants: [
+      { id: 'select-single', icon: icon('cursor'), label: 'Tocar y mover' },
+      { id: 'select-lasso', icon: icon('lasso'), label: 'Lazo (varios)' },
     ]},
     { id: 'shapes', icon: icon('shapes'), label: 'Figuras', showVariant: true, variants: [
       { id: 'cube', icon: icon('cube'), label: 'Cubo' },
@@ -131,19 +148,21 @@ createToolbar({
       { id: 'cylinder', icon: icon('cylinder'), label: 'Cilindro' },
       { id: 'cone', icon: icon('cone'), label: 'Cono' },
     ]},
-    { id: 'plane', icon: icon('planeTool'), label: 'Mover plano', variants: [
+    { id: 'plane', icon: icon('planeTool'), label: 'Plano', showVariant: true, variants: [
       { id: 'plane-move', icon: icon('planeTool'), label: 'Mover plano' },
+      { id: 'plane-rotate', icon: icon('rotatePlane'), label: 'Girar plano' },
     ]},
   ],
 });
 
 createSizeSlider({ id: 'size-slider', order: 1 });
-createPlaneBar({ id: 'plane-bar', order: 1, camCtl, camera, onToast: toast });
+createPlaneBar({ id: 'plane-bar', order: 1, camCtl, camera, scene, onToast: toast });
+createSelectionBar({ id: 'selection-bar', scene, camera, camCtl, onToast: toast });
 const gizmo = createNavGizmo({ id: 'nav-gizmo', camCtl, camera });
 
 // Al cambiar de plano, avisar cuál quedó (feedback sin mirar la barra)
 subscribe(({ drawPlane }) => {
-  const names = { view: 'Plano libre', front: 'Plano frente', side: 'Plano lado', ground: 'Plano suelo', custom: 'Plano propio' };
+  const names = { view: 'Plano libre', front: 'Plano frente', side: 'Plano lado', ground: 'Plano suelo', custom: 'Plano propio', surface: 'Dibujar sobre figuras' };
   toast(names[drawPlane.mode] || 'Plano');
 }, (s) => s.drawPlane.mode);
 
@@ -160,6 +179,16 @@ document.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase(); // con Shift llega 'Z', no 'z'
     if (key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
     else if ((key === 'z' && e.shiftKey) || key === 'y') { e.preventDefault(); redo(); }
+    else if (key === 'd') {
+      const list = selectedObjects(scene);
+      if (list.length) { e.preventDefault(); duplicateObjects(scene, list); }
+    }
+    return;
+  }
+  if (e.key === 'Escape') { setSelection([]); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    const list = selectedObjects(scene);
+    if (list.length) { e.preventDefault(); deleteObjects(scene, list); }
     return;
   }
   const tools = { b: 'brush', e: 'eraser', v: 'select', s: 'shapes', p: 'plane' };

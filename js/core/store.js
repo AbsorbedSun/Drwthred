@@ -19,6 +19,10 @@ let state = {
   layers: [{ id: 'layer-1', name: 'Capa 1', visible: true }],
   activeLayerId: 'layer-1',
   savedViews: [],
+  // Selección: `selectedIds` es la lista real (el lazo selecciona varios);
+  // `selectedId` es el primero, para el código que solo piensa en uno.
+  // setState mantiene ambos sincronizados, se escriba el que se escriba.
+  selectedIds: [],
   selectedId: null,
 
   // Última variante usada de cada herramienta — tocar una herramienta en
@@ -48,6 +52,14 @@ export function getState() {
 }
 
 export function setState(patch) {
+  if ('selectedId' in patch && !('selectedIds' in patch)) {
+    patch = { ...patch, selectedIds: patch.selectedId ? [patch.selectedId] : [] };
+  } else if ('selectedIds' in patch && !('selectedId' in patch)) {
+    patch = { ...patch, selectedId: patch.selectedIds[0] || null };
+  }
+  if ('selectedIds' in patch && sameSlice(patch.selectedIds, state.selectedIds)) {
+    patch = { ...patch, selectedIds: state.selectedIds }; // misma lista: no es un cambio
+  }
   let changed = false;
   for (const k in patch) {
     if (state[k] !== patch[k]) { changed = true; break; }

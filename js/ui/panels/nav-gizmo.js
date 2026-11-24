@@ -33,16 +33,22 @@ export function createNavGizmo({ id = 'nav-gizmo', camCtl, camera }) {
   wrap.append(canvas, home);
 
   const ctx = canvas.getContext('2d');
-  let size = 0, dpr = 1;
+  let size = 0, dpr = 0;
   let ends = []; // posiciones en pantalla de las puntas, para el hit-test
 
   function resize() {
-    size = isNarrow() ? 76 : 92;
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const nextSize = isNarrow() ? 76 : 92;
+    const nextDpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (nextSize === size && nextDpr === dpr) return;
+    size = nextSize;
+    dpr = nextDpr;
     canvas.style.width = canvas.style.height = `${size}px`;
+    // Cambiar el ancho de un canvas lo BORRA: hay que redibujar sí o sí,
+    // aunque la cámara no se haya movido (antes quedaba un círculo vacío).
     canvas.width = canvas.height = Math.round(size * dpr);
+    lastKey = '';
+    draw();
   }
-  resize();
   window.addEventListener('resize', resize);
 
   const inv = new THREE.Quaternion();
@@ -129,6 +135,7 @@ export function createNavGizmo({ id = 'nav-gizmo', camCtl, camera }) {
   canvas.addEventListener('pointerup', end);
   canvas.addEventListener('pointercancel', end);
 
+  resize();
   register({ id, slot: { wide: 'corner-bottom-right', narrow: 'edge-right-center' }, order: 0, el: wrap });
   return { el: wrap, draw };
 }

@@ -56,6 +56,7 @@ export function serializeProject(scene) {
       if (ud.strokeFaceNormal) s.faceNormal = ud.strokeFaceNormal;
       if (ud.brush) s.brush = ud.brush;
       if (ud.strokeNib) s.nib = ud.strokeNib;
+      if (ud.strokeNormals) s.normals = ud.strokeNormals;
       // Solo se guarda la transformación si el trazo se movió de donde se dibujó
       const c = new THREE.Vector3();
       ud.strokePoints.forEach((p) => { c.x += p[0]; c.y += p[1]; c.z += p[2]; });
@@ -101,11 +102,12 @@ export function loadProject(scene, strokeEngine, data, { strokeOptions = null } 
     const pr = s.pressures || [];
     const faceNormal = s.faceNormal ? new THREE.Vector3().fromArray(s.faceNormal) : null;
     const extra = strokeOptions ? strokeOptions(s) : {};
+    const nv = (i) => (s.normals && s.normals[i] ? new THREE.Vector3().fromArray(s.normals[i]) : null);
     strokeEngine.startStroke(pts[0], {
       color: s.color, width: s.width, meta: { layerId: s.layerId }, pressure: pr[0] ?? 1, faceNormal,
-      brush: s.brush || null, nib: s.nib || null, ...extra,
+      brush: s.brush || null, nib: s.nib || null, normal: nv(0), ...extra,
     });
-    for (let i = 1; i < pts.length; i++) strokeEngine.addPoint(pts[i], pr[i] ?? 1);
+    for (let i = 1; i < pts.length; i++) strokeEngine.addPoint(pts[i], pr[i] ?? 1, nv(i));
     const done = strokeEngine.endStroke();
     if (done && done.mesh) applyTransform(done.mesh, s.transform);
   });
