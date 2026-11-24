@@ -2,74 +2,18 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Sistema de HUD — prueba de concepto</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1815">
+<title>Drwthred</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <canvas id="scene-canvas"></canvas>
 
-<main class="doc" id="doc-panel">
-  <button class="doc-close" id="doc-close" title="Cerrar (esto es solo la explicación de la demo)">×</button>
-  <h1>Sistema de HUD — prueba de concepto</h1>
-  <p class="lede">
-    Antes de tocar el motor de dibujo, esto prueba la pieza que existe para
-    que <strong>nunca más tengamos que arreglar a mano</strong> un botón
-    tapando a otro.
-  </p>
-
-  <section>
-    <h2>Probá esto primero: la rueda de herramientas</h2>
-    <ol>
-      <li>Tocá el ícono ✎ (arriba a la izquierda) — se abren 4 herramientas en arco: <strong>Pincel, Goma, Figuras, Selección</strong>.</li>
-      <li>Tocá cualquiera de esas — se abre un <strong>submenú satélite</strong> con las variantes de esa herramienta (ej: Figuras → Plano, Cubo, Esfera, Cilindro, Cono).</li>
-      <li>Elegí una variante — se vuelve la herramienta activa (el ícono del disparador cambia) y todo se cierra solo.</li>
-      <li>Mirá el botón ⚙ debajo — <strong>se corre solo</strong> cuando la rueda se abre (pasa de 44px a 260px de alto). Nadie le avisó que tenía que moverse.</li>
-    </ol>
-  </section>
-
-  <section>
-    <h2>Las otras categorías, en vivo</h2>
-    <ul class="cat-list">
-      <li><strong>Capas</strong> — botón ▤ abajo a la izquierda. Agregar, activar, ocultar/mostrar. Reactivo con la escena.</li>
-      <li><strong>Vistas guardadas</strong> — botón ⛶ arriba centrado. Guardá el ángulo de cámara actual, tocá una para volver exacto a esa vista.</li>
-      <li><strong>Archivo</strong> — botón ⤓ abajo a la derecha. Guardar/Cargar proyecto (.json real, con descarga y selector de archivo reales) y exportar imagen (.png).</li>
-      <li><strong>Notificación transitoria</strong> — <button id="toast-trigger" class="demo-btn demo-btn-sm">Disparar un toast</button></li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>Qué mirar en el código</h2>
-    <p><code>js/ui/hud-manager.js</code> es el único archivo que sabe de
-    coordenadas en píxeles. Todo lo demás (<code>toast.js</code>,
-    <code>panels/tool-wheel.js</code>, <code>demo.js</code>) solo dice
-    <em>"quiero vivir en esta esquina, en este orden"</em> — nunca un
-    <code>top</code> o <code>right</code> a mano.</p>
-  </section>
-
-  <section>
-    <h2>Mover, escalar y rotar — Figuras y Selección</h2>
-    <p>Colocá una figura (Figuras) o dibujá algo y tocalo (Selección) —
-    queda resaltado. <strong>Arrastrar con 1 dedo</strong> lo mueve.
-    <strong>Pellizcar con 2 dedos</strong> lo escala; <strong>girar los
-    2 dedos</strong> lo rota — sobre su propio eje, no sobre el origen
-    del mundo. Todo entra al mismo deshacer/rehacer.</p>
-    <ul>
-      <li><code>drawing/transform.js</code> — mover/escalar/rotar en sí. <code>node tests/transform.test.js</code></li>
-      <li>Arreglé de paso un problema real: los trazos guardaban su geometría en coordenadas absolutas con el pivote siempre en (0,0,0) — escalar así los hacía "volar" desde el origen del mundo en vez de crecer sobre sí mismos. Ahora el pivote queda en el propio centroide del trazo.</li>
-      <li>Encontré y arreglé otro bug en el camino: el primer dedo de un gesto de 2 dedos, si no le pegaba a nada, deseleccionaba antes de que llegara el segundo dedo — <code>drawing/selection.js</code> separó el hit-test puro de la decisión de deseleccionar, que ahora se resuelve recién al soltar.</li>
-    </ul>
-    <p class="lede" style="font-size:13px">
-      204 aserciones automáticas en total entre los 12 módulos probados
-      con Node, más las pruebas de integración en Playwright de esta
-      sección — incluida una prueba visual de rotación real (un cono
-      girando 90° sobre su propio eje, no sobre el mundo).
-    </p>
-  </section>
-</main>
-
-<script type="module" src="js/demo.js"></script>
-<script type="module" src="js/scene-demo.js"></script>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>

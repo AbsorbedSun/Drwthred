@@ -16,6 +16,25 @@ let state = {
   activeLayerId: 'layer-1',
   savedViews: [],
   selectedId: null,
+
+  // Última variante usada de cada herramienta — tocar una herramienta en
+  // la barra la reactiva con la variante que tenía, sin abrir submenú.
+  toolVariants: { brush: 'pencil', eraser: 'erase-full', shapes: 'cube', select: 'select-single', plane: 'plane-move' },
+
+  // Plano de dibujo activo (estilo Feather). mode:
+  //   'view'   → plano libre, siempre de frente a la cámara (comportamiento original)
+  //   'front' | 'side' | 'ground' → planos fijos alineados a los ejes del mundo
+  //   'custom' → plano fijo con cualquier normal (capturado desde la vista)
+  // Ecuación del plano fijo: normal · p = offset
+  drawPlane: { mode: 'view', normal: [0, 0, 1], offset: 0 },
+  mirror: false,             // simetría respecto al plano X = 0
+
+  // Entrada: 'auto' (si aparece un lápiz, el lápiz dibuja y el dedo
+  // navega), 'pen' (forzar ese modo) o 'touch' (el dedo dibuja).
+  inputMode: 'auto',
+  penDetected: false,
+  pressure: true,            // el lápiz modula el grosor con la presión
+  smoothing: 0.35,           // 0 = sin suavizado, ~0.7 = muy suave
 };
 
 const listeners = new Set();

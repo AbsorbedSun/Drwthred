@@ -12,7 +12,7 @@ function ensureEl() {
   if (el) return el;
   el = document.createElement('div');
   el.className = 'hud-toast';
-  register({ id: 'toast', slot: 'edge-bottom-center', order: 0, el });
+  register({ id: 'toast', slot: 'overlay-top-center', order: 0, el });
   return el;
 }
 

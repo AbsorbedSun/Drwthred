@@ -2,259 +2,290 @@
 
 :root{
   /* Paleta oscura por defecto — hace juego con el lienzo 3D, que siempre
-     es oscuro (es una elección del producto, no del tema del sistema).
-     Quien prefiera modo claro en su sistema lo tiene abajo, en el
-     @media — esto es adaptación real, no un tema fijo. */
+     es oscuro. Quien prefiera modo claro en su sistema lo tiene abajo. */
   --ink:#ece7dc;
   --mut:#948d7d;
   --pan:#211f1a;
+  --pan-2:#2a2721;
   --bg:#17150f;
   --bdr:#3a362d;
   --accent:#3dbfae;
-  --touch-min:44px;
-  --hud-gap:10px;
-  --r:10px;
+  --accent-ink:#0d1f1c;
+  --front:#5b8def;
+  --side:#e8655a;
+  --ground:#6cc070;
+  --custom:#3dbfae;
+  --mirror:#e07ab8;
+  --shadow:0 6px 24px rgba(0,0,0,.28);
+  /* Tamaño táctil: 48px en tablet (guía de Apple/Material para dedos),
+     44px en teléfono, donde el espacio manda. */
+  --btn:48px;
+  --r:16px;
+  --font:'DM Sans',system-ui,-apple-system,sans-serif;
+  --mono:'DM Mono',ui-monospace,monospace;
 }
-
+@media (max-width:640px), (max-height:520px){
+  :root{ --btn:44px; --r:14px; }
+}
 @media (prefers-color-scheme: light){
   :root{
-    --ink:#2b2822;
-    --mut:#8a8378;
-    --pan:#fffdf9;
-    --bg:#f4f1ea;
-    --bdr:#e3ddd0;
-    --accent:#2a9d8f;
+    --ink:#2b2822; --mut:#7d766a; --pan:#fffdf9; --pan-2:#f1ede4; --bg:#f4f1ea; --bdr:#e3ddd0;
+    --accent:#2a9d8f; --accent-ink:#ffffff; --shadow:0 6px 24px rgba(0,0,0,.16);
   }
 }
 
 *{box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
 body{
   margin:0;
   background:var(--bg);
   color:var(--ink);
-  font-family:'DM Sans',sans-serif;
+  font-family:var(--font);
   -webkit-tap-highlight-color:transparent;
+  -webkit-text-size-adjust:100%;
+  overscroll-behavior:none;
 }
+#scene-canvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block;touch-action:none}
 
-#scene-canvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block}
+button{font-family:inherit;color:inherit}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-.doc{
-  position:relative;
-  z-index:1;
-  max-width:640px;
-  margin:20px auto;
-  padding:32px 28px 60px;
-  background:color-mix(in srgb, var(--bg) 92%, transparent);
-  backdrop-filter:blur(10px);
-  -webkit-backdrop-filter:blur(10px);
-  border-radius:18px;
-  box-shadow:0 8px 32px rgba(0,0,0,.25);
-  transition:opacity .2s ease, transform .2s ease;
+/* Toda la HUD: sin selección de texto, sin menú de "copiar" al mantener
+   apretado en iOS, sin el retardo de doble-toque-para-zoom. */
+.hud-item,.hud-popover,.help-sheet{
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation;
 }
-.doc.hidden{opacity:0;transform:scale(.98);pointer-events:none}
-.doc-close{
-  position:absolute;top:14px;right:14px;
-  width:32px;height:32px;border-radius:50%;
-  border:1px solid var(--bdr);background:var(--pan);color:var(--ink);
-  font-size:18px;line-height:1;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-}
-h1{font-size:22px;letter-spacing:-.01em;margin:0 0 8px}
-h2{font-size:15px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin:32px 0 10px;font-family:'DM Mono',monospace;font-weight:500}
-.lede{font-size:15px;line-height:1.6;color:var(--ink);opacity:.85}
-section{padding-top:4px}
-ol,ul{padding-left:20px;line-height:1.7;font-size:14px}
-.cat-list{list-style:none;padding:0;display:flex;flex-direction:column;gap:10px}
-.cat-list li{background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r);padding:12px 14px;font-size:14px;line-height:1.5}
-code{font-family:'DM Mono',monospace;font-size:.9em;background:var(--bdr);padding:1px 5px;border-radius:4px}
+.hud-item svg,.hud-popover svg{width:20px;height:20px;flex-shrink:0}
 
-.demo-btn{
-  height:var(--touch-min);
-  padding:0 18px;
-  border-radius:8px;
-  border:1px solid var(--bdr);
-  background:var(--pan);
-  color:var(--ink);
-  font-family:'DM Mono',monospace;
-  font-size:13px;
-  cursor:pointer;
-  margin-top:10px;
-  box-shadow:0 1px 3px rgba(0,0,0,.04);
-}
-.demo-btn:active{background:var(--bdr)}
-.demo-btn-sm{height:34px;padding:0 12px;margin:0;font-size:12px}
-
-/* ══════════ Componentes de HUD ══════════ */
-/* Cualquier SVG que caiga dentro de un botón/disparador del HUD se
-   dimensiona igual — una sola regla, no una por cada clase de botón. */
-.hud-fab svg,.hud-trigger svg,.tool-wheel-trigger svg,.tool-wheel-seg svg,
-.tool-wheel-variant svg,.layer-eye svg{width:18px;height:18px;flex-shrink:0}
-.file-action svg,.layer-add-btn svg{width:16px;height:16px;flex-shrink:0}
-
+/* ══════════ Botones base ══════════ */
 .hud-fab{
-  width:var(--touch-min);
-  height:var(--touch-min);
-  border-radius:50%;
-  border:1px solid var(--bdr);
-  background:var(--pan);
-  color:var(--ink);
+  width:var(--btn);height:var(--btn);border-radius:50%;
+  border:1px solid var(--bdr);background:var(--pan);color:var(--ink);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
+  box-shadow:var(--shadow);
+  transition:background .15s, color .15s, opacity .15s, transform .1s;
+}
+.hud-fab:active{transform:scale(.94)}
+.hud-fab.is-open{background:var(--ink);color:var(--pan);border-color:var(--ink)}
+.hud-fab:disabled{opacity:.35;cursor:default;box-shadow:none}
+.hud-btn-group{display:flex;gap:8px}
+
+/* ══════════ Barra de herramientas ══════════ */
+.hud-toolbar{
+  display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;
+  background:var(--pan);border:1px solid var(--bdr);border-radius:calc(var(--r) + 6px);
+  box-shadow:var(--shadow);
+}
+.hud-toolbar[data-slot="edge-bottom-center"]{flex-direction:row}
+.tool-btn{
+  position:relative;width:var(--btn);height:var(--btn);border-radius:var(--r);
+  border:none;background:transparent;color:var(--ink);cursor:pointer;padding:0;
   display:flex;align-items:center;justify-content:center;
-  cursor:pointer;
-  box-shadow:0 2px 8px rgba(0,0,0,.1);
-  transition:height .35s ease, width .35s ease, border-radius .35s ease, opacity .15s ease, background .15s ease, color .15s ease;
+  transition:background .15s,color .15s,transform .1s;
 }
-.hud-fab:disabled{opacity:.3;cursor:default;box-shadow:none}
-
-.hud-btn-group{display:flex;gap:6px}
-
-/* El wrapper ya NO es un contenedor flex que apila disparador+panel — eso
-   era el bug: aunque el panel estuviera invisible (opacity:0), seguía
-   ocupando espacio en el layout, empujando al disparador lejos de su
-   esquina en los slots anclados por "bottom" (arriba no se notaba, por
-   pura coincidencia con cómo cae el anclaje). Ahora el wrapper mide
-   exactamente lo que mide el disparador — el panel se posiciona
-   "position:absolute" encima, sin afectar el tamaño de nadie. */
-.hud-context-panel{position:relative;display:inline-block}
-.hud-trigger{
-  width:var(--touch-min);
-  height:var(--touch-min);
-  border-radius:50%;
-  border:1px solid var(--bdr);
-  background:var(--pan);
-  color:var(--ink);
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;
-  box-shadow:0 2px 8px rgba(0,0,0,.1);
-  transition:background .15s ease, color .15s ease;
+.tool-btn svg{width:22px;height:22px}
+.tool-btn:active{transform:scale(.92)}
+.tool-btn.active{background:var(--accent);color:var(--accent-ink)}
+/* Triangulito en la esquina = "tiene variantes" (mantener o re-tocar) */
+.tool-btn.has-variants::after{
+  content:'';position:absolute;right:5px;bottom:5px;width:0;height:0;
+  border-left:5px solid transparent;border-bottom:5px solid currentColor;opacity:.45;
 }
-.hud-panel-detail{
-  position:absolute;
-  width:220px;
-  background:var(--pan);
-  border:1px solid var(--bdr);
-  border-radius:var(--r);
-  padding:12px 14px;
-  font-size:13px;
-  line-height:1.5;
-  box-shadow:0 4px 16px rgba(0,0,0,.08);
-  opacity:0;
-  pointer-events:none;
-  transition:opacity .15s ease, transform .15s ease;
+.toolbar-sep{width:60%;height:1px;background:var(--bdr);margin:3px 0}
+.hud-toolbar[data-slot="edge-bottom-center"] .toolbar-sep{width:1px;height:60%;margin:0 3px}
+.swatch-dot{
+  width:26px;height:26px;border-radius:50%;display:block;
+  border:2px solid var(--pan);box-shadow:0 0 0 1.5px var(--mut);
 }
-.hud-panel-detail p{margin:0 0 6px}
-.hud-panel-detail p:last-child{margin-bottom:0;color:var(--mut)}
 
-/* Cada panel abre hacia el lado libre de pantalla según su esquina —
-   mismo criterio que ya usa la rueda de herramientas para su arco. */
-.layers-panel .hud-panel-detail{left:0;bottom:calc(100% + 6px);transform:translateY(4px) scale(.97);transform-origin:bottom left}
-.layers-panel.open .hud-panel-detail{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
+/* ══════════ Popovers / paneles ══════════ */
+.hud-popover{
+  position:fixed;left:0;top:0;z-index:700;
+  opacity:0;pointer-events:none;transform:scale(.96);
+  transition:opacity .14s ease, transform .14s ease;
+}
+.hud-popover.open{opacity:1;pointer-events:auto;transform:scale(1)}
+.hud-popover[data-place="down"]{transform-origin:top center}
+.hud-popover[data-place="up"]{transform-origin:bottom center}
+.hud-popover[data-place="right"]{transform-origin:center left}
+.hud-popover[data-place="left"]{transform-origin:center right}
+.hud-panel{
+  background:var(--pan);border:1px solid var(--bdr);border-radius:var(--r);
+  padding:12px;min-width:232px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;
+  box-shadow:var(--shadow);font-size:14px;line-height:1.45;
+}
+.panel-title{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--mut);margin:2px 4px 8px}
+.panel-title:not(:first-child){margin-top:14px}
+.panel-hint{font-size:12.5px;color:var(--mut);margin:8px 4px 0;line-height:1.45}
+.panel-action,.variant-row{
+  width:100%;min-height:var(--btn);border-radius:12px;border:none;background:transparent;
+  font-size:15px;text-align:left;padding:0 12px;cursor:pointer;
+  display:flex;align-items:center;gap:12px;
+}
+.panel-action:active,.variant-row:active{background:color-mix(in srgb, var(--ink) 8%, transparent)}
+.panel-action:not(:first-of-type){margin-top:2px}
+.variant-row.active{background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--ink)}
+.variant-row.active svg{color:var(--accent)}
 
-.file-panel .hud-panel-detail{right:0;bottom:calc(100% + 6px);transform:translateY(4px) scale(.97);transform-origin:bottom right}
-.file-panel.open .hud-panel-detail{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
+/* Paleta de color */
+.swatch-grid{display:grid;grid-template-columns:repeat(4, 44px);gap:8px;padding:0 4px}
+.swatch{
+  width:44px;height:44px;border-radius:50%;border:1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  cursor:pointer;padding:0;transition:transform .1s;
+}
+.swatch:active{transform:scale(.9)}
+.swatch.active{box-shadow:0 0 0 3px var(--pan), 0 0 0 5px var(--accent)}
+.custom-color{display:flex;align-items:center;gap:10px;margin:12px 4px 2px;font-size:14px;color:var(--mut);cursor:pointer}
+.custom-color input{width:44px;height:32px;border:none;padding:0;background:none;cursor:pointer}
 
-.views-panel .hud-panel-detail{left:50%;top:calc(100% + 6px);transform:translateX(-50%) translateY(-4px) scale(.97);transform-origin:top center}
-.views-panel.open .hud-panel-detail{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0) scale(1)}
+/* Controles segmentados e interruptores (Ajustes) */
+.seg-control{display:flex;background:var(--pan-2);border-radius:12px;padding:3px;gap:3px}
+.seg-control button{
+  flex:1;min-height:40px;border:none;border-radius:9px;background:transparent;font-size:14px;cursor:pointer;
+}
+.seg-control button.active{background:var(--pan);box-shadow:0 1px 4px rgba(0,0,0,.2);font-weight:700}
+.switch-row{display:flex;align-items:center;justify-content:space-between;min-height:var(--btn);margin:10px 4px 4px;font-size:15px;cursor:pointer}
+.switch-row input{position:absolute;opacity:0;pointer-events:none}
+.switch{width:46px;height:28px;border-radius:14px;background:var(--bdr);position:relative;transition:background .15s;flex-shrink:0}
+.switch::after{content:'';position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .15s}
+.switch-row input:checked + .switch{background:var(--accent)}
+.switch-row input:checked + .switch::after{transform:translateX(18px)}
+.settings-panel{width:300px}
 
+/* Capas / vistas */
+.layers-list{display:flex;flex-direction:column;gap:2px;margin-bottom:8px;max-height:min(46vh, 320px);overflow-y:auto}
+.layer-row{display:flex;align-items:center;gap:8px;min-height:var(--btn);padding:0 8px;border-radius:12px;cursor:pointer}
+.layer-row:active{background:color-mix(in srgb, var(--ink) 6%, transparent)}
+.layer-row.active{background:color-mix(in srgb, var(--accent) 18%, transparent)}
+.layer-eye{width:40px;height:40px;border:none;background:transparent;cursor:pointer;color:var(--ink);
+  flex-shrink:0;padding:0;display:flex;align-items:center;justify-content:center;border-radius:10px}
+.layer-name{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.layer-add-btn{width:100%;min-height:var(--btn);border-radius:12px;border:1px dashed var(--bdr);background:transparent;
+  color:var(--mut);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.layer-add-btn:active{background:color-mix(in srgb, var(--ink) 6%, transparent)}
+.view-row{justify-content:space-between}
+.view-row .layer-eye{color:var(--mut)}
+.views-empty{font-size:13px;color:var(--mut);padding:8px 4px 12px;text-align:center;line-height:1.5}
+
+/* ══════════ Slider de grosor ══════════ */
+.hud-slider{
+  width:calc(var(--btn) + 8px);display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 0;
+  background:var(--pan);border:1px solid var(--bdr);border-radius:calc(var(--r) + 6px);box-shadow:var(--shadow);
+  transition:opacity .2s;
+}
+.hud-slider.dim{opacity:.55}
+.slider-preview{width:36px;height:36px;display:flex;align-items:center;justify-content:center}
+.slider-dot{display:block;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.slider-track{position:relative;width:100%;height:clamp(110px, 26vh, 220px);cursor:pointer;touch-action:none}
+.slider-track::before{
+  content:'';position:absolute;left:50%;top:0;bottom:0;width:6px;transform:translateX(-50%);
+  border-radius:3px;background:var(--bdr);
+}
+.slider-fill{position:absolute;left:50%;bottom:0;width:6px;transform:translateX(-50%);border-radius:3px;background:var(--accent)}
+.slider-thumb{
+  position:absolute;left:50%;width:22px;height:22px;margin-left:-11px;border-radius:50%;
+  background:var(--ink);box-shadow:0 2px 6px rgba(0,0,0,.35);transition:transform .1s;
+}
+.hud-slider.dragging .slider-thumb{transform:scale(1.25)}
+.slider-value{font-family:var(--mono);font-size:11px;color:var(--mut)}
+
+/* ══════════ Barra de planos ══════════ */
+.hud-planebar{
+  display:flex;align-items:center;gap:4px;padding:5px;
+  background:var(--pan);border:1px solid var(--bdr);border-radius:calc(var(--r) + 6px);box-shadow:var(--shadow);
+}
+.plane-seg{display:flex;gap:3px}
+.plane-btn{
+  width:56px;height:52px;border:none;border-radius:var(--r);background:transparent;cursor:pointer;padding:0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  transition:background .15s,color .15s,opacity .15s;
+}
+.plane-btn svg{width:22px;height:22px}
+.plane-label{font-size:10.5px;letter-spacing:.02em;color:var(--mut)}
+.plane-btn.active .plane-label{color:inherit;font-weight:700}
+.plane-btn:disabled{opacity:.3;cursor:default}
+.plane-view.active{background:color-mix(in srgb, var(--ink) 14%, transparent)}
+.plane-front.active{background:color-mix(in srgb, var(--front) 26%, transparent);color:var(--front)}
+.plane-side.active{background:color-mix(in srgb, var(--side) 26%, transparent);color:var(--side)}
+.plane-ground.active{background:color-mix(in srgb, var(--ground) 26%, transparent);color:var(--ground)}
+.plane-custom.active{background:color-mix(in srgb, var(--custom) 26%, transparent);color:var(--custom)}
+.plane-mirror.active{background:color-mix(in srgb, var(--mirror) 26%, transparent);color:var(--mirror)}
+.planebar-sep{width:1px;height:32px;background:var(--bdr);margin:0 3px}
+.offset-chip{
+  min-width:66px;height:52px;border-radius:var(--r);border:1px solid var(--bdr);background:var(--pan-2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:ew-resize;touch-action:none;padding:0 8px;
+}
+.offset-chip:disabled{opacity:.35;cursor:default}
+.offset-chip.dragging{border-color:var(--accent);color:var(--accent)}
+.offset-arrows{font-size:13px;letter-spacing:.3em;color:var(--mut);line-height:1}
+.offset-val{font-family:var(--mono);font-size:13px}
+
+/* ══════════ Gizmo de ejes ══════════ */
+.hud-gizmo{display:flex;flex-direction:column;align-items:center;gap:6px}
+.gizmo-canvas{
+  display:block;border-radius:50%;cursor:grab;touch-action:none;
+  background:color-mix(in srgb, var(--pan) 72%, transparent);
+  border:1px solid var(--bdr);box-shadow:var(--shadow);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+}
+.hud-gizmo.dragging .gizmo-canvas{cursor:grabbing;border-color:var(--accent)}
+.gizmo-home{
+  width:40px;height:40px;border-radius:50%;border:1px solid var(--bdr);background:var(--pan);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;padding:0;box-shadow:var(--shadow);
+}
+.gizmo-home svg{width:18px;height:18px}
+
+/* ══════════ Toast ══════════ */
 .hud-toast{
-  background:var(--ink);
-  color:var(--pan);
-  font-family:'DM Mono',monospace;
-  font-size:13px;
-  padding:9px 16px;
-  border-radius:20px;
-  box-shadow:0 4px 16px rgba(0,0,0,.18);
-  opacity:0;
-  transform:translateY(6px);
-  pointer-events:none;
-  transition:opacity .18s ease, transform .18s ease;
-  white-space:nowrap;
+  background:var(--ink);color:var(--pan);font-family:var(--mono);font-size:13px;
+  padding:9px 16px;border-radius:20px;box-shadow:var(--shadow);
+  opacity:0;transform:translateY(-6px);pointer-events:none;
+  transition:opacity .18s ease, transform .18s ease;white-space:nowrap;
+  max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis;
 }
 .hud-toast.show{opacity:1;transform:translateY(0)}
 
-/* ══════════ Rueda radial de herramientas ══════════ */
-
-.tool-wheel{position:relative;transition:width .28s ease,height .28s ease}
-
-.tool-wheel-trigger{
-  position:absolute;
-  width:44px;height:44px;border-radius:50%;
-  border:1px solid var(--bdr);background:var(--pan);color:var(--ink);
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;z-index:3;
-  box-shadow:0 2px 8px rgba(0,0,0,.12);
-  transition:background .15s,color .15s;
+/* ══════════ Hoja de ayuda ══════════ */
+.help-sheet{
+  position:fixed;inset:0;z-index:900;display:flex;align-items:center;justify-content:center;
+  padding:max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background:rgba(8,7,5,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  opacity:0;pointer-events:none;transition:opacity .2s;
 }
-.tool-wheel.open .tool-wheel-trigger{background:var(--ink);color:var(--pan);border-color:var(--ink)}
-
-.tool-wheel-ring{position:absolute;inset:0;pointer-events:none}
-.tool-wheel-seg{
-  position:absolute;
-  width:44px;height:44px;border-radius:50%;
-  transform:translate(-50%,-50%) scale(.3);
-  border:1px solid var(--bdr);background:var(--pan);color:var(--ink);
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;
-  opacity:0;pointer-events:none;
-  transition:transform .22s cubic-bezier(.2,.9,.3,1.3),opacity .18s;
-  box-shadow:0 2px 8px rgba(0,0,0,.1);
+.help-sheet.open{opacity:1;pointer-events:auto}
+.sheet-card{
+  position:relative;width:min(760px, 100%);max-height:100%;overflow:auto;
+  background:var(--bg);border:1px solid var(--bdr);border-radius:22px;padding:28px 28px 22px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);transform:translateY(10px);transition:transform .2s;
 }
-.tool-wheel.open .tool-wheel-seg{
-  transform:translate(-50%,-50%) scale(1);
-  opacity:1;pointer-events:auto;
+.help-sheet.open .sheet-card{transform:none}
+.sheet-card h1{font-size:22px;letter-spacing:-.01em;margin:0 44px 8px 0}
+.sheet-lede{font-size:15px;line-height:1.6;opacity:.9;margin:0 0 16px}
+.sheet-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(290px, 1fr));gap:12px}
+.sheet-grid section{background:var(--pan);border:1px solid var(--bdr);border-radius:14px;padding:12px 14px}
+.sheet-grid h2{font-family:var(--mono);font-weight:500;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin:0 0 8px}
+.sheet-grid ul{list-style:none;margin:0;padding:0;font-size:14px;line-height:1.5;display:flex;flex-direction:column;gap:6px}
+.sheet-grid li{display:flex;gap:10px}
+.sheet-grid .g{flex:0 0 112px;font-weight:700;color:var(--accent)}
+.sheet-close{
+  position:absolute;top:16px;right:16px;width:44px;height:44px;border-radius:50%;
+  border:1px solid var(--bdr);background:var(--pan);cursor:pointer;display:flex;align-items:center;justify-content:center;
 }
-.tool-wheel-seg.picked{background:var(--accent);border-color:var(--accent);color:#fff}
-
-.tool-wheel-submenu{
-  position:absolute;
-  transform:translate(-50%,-50%) scale(.8);
-  display:flex;gap:6px;padding:6px;
-  background:var(--pan);border:1px solid var(--bdr);border-radius:22px;
-  box-shadow:0 4px 16px rgba(0,0,0,.14);
-  opacity:0;pointer-events:none;
-  transition:opacity .15s,transform .15s;
-  z-index:4;
+.sheet-close svg{width:18px;height:18px}
+.sheet-ok{
+  display:block;margin:18px auto 0;min-height:var(--btn);padding:0 28px;border-radius:24px;border:none;
+  background:var(--accent);color:var(--accent-ink);font-size:16px;font-weight:700;cursor:pointer;
 }
-.tool-wheel-submenu.open{opacity:1;transform:translate(-50%,-50%) scale(1);pointer-events:auto}
-.tool-wheel-variant{
-  width:38px;height:38px;border-radius:50%;
-  border:1px solid var(--bdr);background:var(--bg);color:var(--ink);
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;flex-shrink:0;
-  transition:background .15s,color .15s;
+
+/* ══════════ Teléfono / pantallas bajas ══════════ */
+@media (max-width:640px), (max-height:520px){
+  .plane-btn{width:44px;height:44px}
+  .plane-label{display:none}
+  .plane-align{display:none}
+  .plane-custom:not(.active){display:none}
+  .offset-chip{min-width:54px;height:44px}
+  .planebar-sep{height:26px;margin:0 2px}
+  .hud-planebar{gap:2px;padding:4px}
+  .sheet-card{padding:22px 18px 18px}
+  .sheet-card h1{font-size:19px}
 }
-.tool-wheel-variant:active{background:var(--accent);color:#fff}
-
-/* ══════════ Panel de capas ══════════ */
-
-.layers-panel-detail{width:200px;transform-origin:bottom left}
-.layers-panel{align-items:flex-start}
-.layers-panel .hud-trigger svg{width:18px;height:18px}
-.layers-title{font-size:11px;letter-spacing:.1em;color:var(--mut);margin-bottom:8px;font-family:'DM Mono',monospace}
-.layers-list{display:flex;flex-direction:column;gap:2px;margin-bottom:8px;max-height:180px;overflow-y:auto}
-.layer-row{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer}
-.layer-row:hover{background:color-mix(in srgb, var(--ink) 5%, transparent)}
-.layer-row.active{background:color-mix(in srgb, var(--accent) 15%, transparent)}
-.layer-eye{width:26px;height:26px;border:none;background:transparent;cursor:pointer;color:var(--ink);
-  flex-shrink:0;padding:0;display:flex;align-items:center;justify-content:center}
-.layer-name{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.layer-add-btn{width:100%;height:34px;border-radius:8px;border:1px dashed var(--bdr);background:transparent;
-  color:var(--mut);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
-.layer-add-btn:active{background:color-mix(in srgb, var(--ink) 6%, transparent)}
-
-/* ══════════ Panel de vistas guardadas ══════════ */
-
-.views-panel{align-items:center}
-.views-panel-detail{width:200px;transform-origin:top center}
-.view-row{justify-content:space-between}
-.view-row .layer-name{cursor:pointer;flex:1}
-.view-row .layer-eye svg{width:14px;height:14px}
-.view-row .layer-eye{color:var(--mut)}
-.views-empty{font-size:12px;color:var(--mut);padding:8px 4px;text-align:center;line-height:1.5}
-
-/* ══════════ Panel de archivo (guardar/cargar/exportar) ══════════ */
-
-.file-panel-detail{width:200px;display:flex;flex-direction:column;gap:4px;transform-origin:bottom right}
-.file-action{width:100%;height:40px;border-radius:8px;border:1px solid var(--bdr);background:transparent;
-  color:var(--ink);font-size:13px;text-align:left;padding:0 12px;cursor:pointer;font-family:'DM Sans',sans-serif;
-  display:flex;align-items:center;gap:10px}
-.file-action:active{background:color-mix(in srgb, var(--ink) 6%, transparent)}

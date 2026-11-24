@@ -47,27 +47,33 @@ export function erasePartial(scene, camera, ndcX, ndcY, radius = 0.12) {
   const hitPoint = hit.point;
 
   const rawPoints = mesh.userData.strokePoints.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
+  const pressures = mesh.userData.strokePressures || null;
+  const faceArr = mesh.userData.strokeFaceNormal || null;
+  const faceNormal = faceArr ? new THREE.Vector3().fromArray(faceArr) : null;
   const width = mesh.userData.strokeWidth;
   const color = mesh.userData.strokeColor;
   const layerId = mesh.userData.layerId;
 
-  // Partir en tramos contiguos de puntos que quedan FUERA del radio de borrado
+  // Partir en tramos contiguos de puntos (por índice, para arrastrar la
+  // presión de cada punto) que quedan FUERA del radio de borrado.
   const segments = [];
   let current = [];
-  for (const p of rawPoints) {
+  rawPoints.forEach((p, i) => {
     if (p.distanceTo(hitPoint) > radius) {
-      current.push(p);
+      current.push(i);
     } else if (current.length) {
       segments.push(current);
       current = [];
     }
-  }
+  });
   if (current.length) segments.push(current);
 
   const newMeshes = segments
-    .filter((seg) => seg.length >= 2)
-    .map((seg) => {
-      const geo = buildRibbonGeometry(seg, width, camera.position);
+    .filter((idx) => idx.length >= 2)
+    .map((idx) => {
+      const seg = idx.map((i) => rawPoints[i]);
+      const segPressures = pressures ? idx.map((i) => pressures[i]) : null;
+      const geo = buildRibbonGeometry(seg, width, camera.position, { widths: segPressures, faceNormal });
       // Mismo centrado de pivote que stroke-engine.js — un pedazo de
       // trazo recién partido también tiene que poder escalarse/rotarse
       // sobre sí mismo más adelante, no sobre el origen del mundo.
@@ -85,6 +91,8 @@ export function erasePartial(scene, camera, ndcX, ndcY, radius = 0.12) {
         strokeColor: color,
         strokePoints: seg.map((p) => p.toArray()),
       };
+      if (segPressures) m.userData.strokePressures = segPressures;
+      if (faceArr) m.userData.strokeFaceNormal = faceArr.slice();
       return m;
     });
 

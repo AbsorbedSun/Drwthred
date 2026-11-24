@@ -49,6 +49,19 @@ const PATHS = {
   eyeClosed: `<path d="M3 3l18 18"/><path d="M10.6 5.2A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.4 17.4 0 0 1-3.4 4.2M6.6 6.6C4 8.3 2 12 2 12s3.5 7 10 7c1.4 0 2.7-.3 3.9-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>`,
   plus: `<path d="M12 5v14M5 12h14"/>`,
   close: `<path d="M6 6l12 12M18 6L6 18"/>`,
+  help: `<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.4c-.6.3-1 .8-1 1.5v.6"/><circle cx="12" cy="16.8" r=".7" fill="currentColor" stroke="none"/>`,
+  home: `<path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/>`,
+
+  // Planos de dibujo (estilo Feather)
+  planeTool: `<path d="M3 17.5l4.5-4.5H21l-4.5 4.5z"/><path d="M12 3v7M9.2 5.8L12 3l2.8 2.8"/>`,
+  planeFree: `<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 2.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>`,
+  planeFront: `<rect x="5" y="5" width="14" height="14" rx="1.2"/><path d="M5 12h14M12 5v14" stroke-opacity=".45"/>`,
+  planeSide: `<path d="M8 3.5l8 3.5v13.5l-8-3.5z"/><path d="M8 10.3l8 3.5" stroke-opacity=".45"/>`,
+  planeGround: `<path d="M2.5 16l5.5-6h13.5l-5.5 6z"/><path d="M9.3 16l5.5-6" stroke-opacity=".45"/>`,
+  planeCustom: `<path d="M4 15.5L10 4l10 4.5-6 11.5z"/><path d="M7 9.8l10 4.5" stroke-opacity=".45"/>`,
+  mirror: `<path d="M12 2.5v19" stroke-dasharray="2 2.4"/><path d="M9 7L4 17h5zM15 7l5 10h-5z"/>`,
+  alignView: `<circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>`,
+  planeHere: `<path d="M3 17.5l4.5-4.5H21l-4.5 4.5z"/><circle cx="12" cy="7" r="3"/><path d="M12 10v5"/>`,
   gear: `<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1z"/>`,
 };
 

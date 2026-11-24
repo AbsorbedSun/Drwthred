@@ -1,0 +1,177 @@
+// ============================================================================
+// APP — punto de entrada único. Arma la escena, la entrada y la HUD.
+// (Reemplaza a demo.js + scene-demo.js: la HUD nueva necesita la cámara
+// para varios paneles — barra de planos, gizmo — y partirla en dos
+// archivos ya no tenía sentido.)
+//
+// Distribución de la HUD (tablet):
+//   arriba-izq   : Archivo · Capas · Vistas · Ajustes
+//   arriba-der   : Deshacer · Rehacer
+//   borde izq    : barra de herramientas + color
+//   borde der    : grosor
+//   abajo-centro : barra de planos
+//   abajo-der    : gizmo de ejes
+// En teléfono el HUD manager muda la barra de herramientas abajo y el
+// gizmo al borde derecho, sin que este archivo tenga que saberlo.
+// ============================================================================
+import { createScene } from './core/scene.js';
+import { createCameraController } from './core/camera-controller.js';
+import { getState, setState, subscribe } from './core/store.js';
+import { undo, redo, canUndo, canRedo, subscribeHistory } from './core/history.js';
+import { attachGestures } from './input/gestures.js';
+import { createToolRouter } from './input/tool-router.js';
+import { createStrokeEngine } from './drawing/stroke-engine.js';
+import { syncLayerVisibility } from './drawing/layers.js';
+import { syncSelectionHighlight } from './drawing/selection.js';
+import { createTransformController } from './drawing/transform.js';
+import { createPlaneGuide } from './drawing/plane-guide.js';
+import { register } from './ui/hud-manager.js';
+import { toast } from './ui/toast.js';
+import { icon } from './ui/icons.js';
+import { createToolbar } from './ui/panels/toolbar.js';
+import { createSizeSlider } from './ui/panels/size-slider.js';
+import { createPlaneBar } from './ui/panels/plane-bar.js';
+import { createNavGizmo } from './ui/panels/nav-gizmo.js';
+import { createLayersPanel } from './ui/panels/layers-panel.js';
+import { createViewsPanel } from './ui/panels/views-panel.js';
+import { createFilePanel } from './ui/panels/file-panel.js';
+import { createSettingsPanel, isPenMode } from './ui/panels/settings-panel.js';
+import { createHelpSheet } from './ui/help-sheet.js';
+
+// ── Escena ──
+const canvas = document.getElementById('scene-canvas');
+const { scene, camera, renderer, render } = createScene(canvas);
+const camCtl = createCameraController(camera);
+const strokeEngine = createStrokeEngine(scene, camera);
+const mirrorEngine = createStrokeEngine(scene, camera); // trazo espejado en vivo
+const planeGuide = createPlaneGuide(scene);
+
+syncLayerVisibility(scene);
+syncSelectionHighlight(scene);
+const transform = createTransformController({ scene, camera });
+
+// ── Entrada ──
+const toolRouter = createToolRouter({
+  scene, camera, camCtl, strokeEngine, mirrorEngine, transform,
+  onNotice: (msg) => toast(msg),
+});
+
+function doUndo() { if (undo()) toast('Deshecho'); else toast('Nada para deshacer'); }
+function doRedo() { if (redo()) toast('Rehecho'); else toast('Nada para rehacer'); }
+
+attachGestures(canvas, {
+  camCtl, router: toolRouter, transform,
+  isPenMode: () => isPenMode(),
+  onPenDetected: () => {
+    const st = getState();
+    if (st.penDetected) return;
+    setState({ penDetected: true });
+    if (st.inputMode === 'auto') toast('Lápiz detectado: el lápiz dibuja, el dedo navega');
+  },
+  onUndo: doUndo,
+  onRedo: doRedo,
+});
+
+// ── HUD: fila superior izquierda ──
+createFilePanel({ id: 'file-panel', slot: 'corner-top-left', order: 0, scene, strokeEngine, renderer, onToast: toast });
+createLayersPanel({ id: 'layers-panel', slot: 'corner-top-left', order: 1 });
+createViewsPanel({ id: 'views-panel', slot: 'corner-top-left', order: 2, camCtl });
+const help = createHelpSheet();
+createSettingsPanel({ id: 'settings', slot: 'corner-top-left', order: 3, onHelp: () => help.open() });
+
+// ── Deshacer / rehacer ──
+const undoRedoGroup = document.createElement('div');
+undoRedoGroup.className = 'hud-btn-group';
+const undoBtn = document.createElement('button');
+undoBtn.className = 'hud-fab';
+undoBtn.innerHTML = icon('undo');
+undoBtn.title = 'Deshacer (toque con 2 dedos)';
+undoBtn.setAttribute('aria-label', 'Deshacer');
+const redoBtn = document.createElement('button');
+redoBtn.className = 'hud-fab';
+redoBtn.innerHTML = icon('redo');
+redoBtn.title = 'Rehacer (toque con 3 dedos)';
+redoBtn.setAttribute('aria-label', 'Rehacer');
+undoRedoGroup.append(undoBtn, redoBtn);
+register({ id: 'undo-redo-group', slot: 'corner-top-right', order: 0, el: undoRedoGroup });
+
+function syncUndoRedoUI() {
+  undoBtn.disabled = !canUndo();
+  redoBtn.disabled = !canRedo();
+}
+subscribeHistory(syncUndoRedoUI);
+syncUndoRedoUI();
+undoBtn.addEventListener('click', () => { if (!undo()) toast('Nada para deshacer'); });
+redoBtn.addEventListener('click', () => { if (!redo()) toast('Nada para rehacer'); });
+
+// ── Barra de herramientas ──
+createToolbar({
+  id: 'toolbar',
+  tools: [
+    { id: 'brush', icon: icon('pencil'), label: 'Pincel', variants: [
+      { id: 'pencil', icon: icon('pencilThin'), label: 'Lápiz', brushWidth: 0.015 },
+      { id: 'marker', icon: icon('marker'), label: 'Marcador', brushWidth: 0.045 },
+      { id: 'airbrush', icon: icon('airbrush'), label: 'Trazo ancho', brushWidth: 0.09 },
+    ]},
+    { id: 'eraser', icon: icon('eraser'), label: 'Goma', variants: [
+      { id: 'erase-full', icon: icon('eraseFull'), label: 'Borrar trazo entero' },
+      { id: 'erase-partial', icon: icon('erasePartial'), label: 'Borrar una parte' },
+    ]},
+    { id: 'select', icon: icon('cursor'), label: 'Selección', variants: [
+      { id: 'select-single', icon: icon('cursor'), label: 'Seleccionar y mover' },
+    ]},
+    { id: 'shapes', icon: icon('shapes'), label: 'Figuras', variants: [
+      { id: 'cube', icon: icon('cube'), label: 'Cubo' },
+      { id: 'plane', icon: icon('plane'), label: 'Plano' },
+      { id: 'sphere', icon: icon('sphere'), label: 'Esfera' },
+      { id: 'cylinder', icon: icon('cylinder'), label: 'Cilindro' },
+      { id: 'cone', icon: icon('cone'), label: 'Cono' },
+    ]},
+    { id: 'plane', icon: icon('planeTool'), label: 'Mover plano', variants: [
+      { id: 'plane-move', icon: icon('planeTool'), label: 'Mover plano' },
+    ]},
+  ],
+});
+
+createSizeSlider({ id: 'size-slider', order: 1 });
+createPlaneBar({ id: 'plane-bar', order: 1, camCtl, camera, onToast: toast });
+const gizmo = createNavGizmo({ id: 'nav-gizmo', camCtl, camera });
+
+// Al cambiar de plano, avisar cuál quedó (feedback sin mirar la barra)
+let lastPlaneMode = getState().drawPlane.mode;
+subscribe(({ drawPlane }) => {
+  if (drawPlane.mode === lastPlaneMode) return;
+  lastPlaneMode = drawPlane.mode;
+  const names = { view: 'Plano libre', front: 'Plano frente', side: 'Plano lado', ground: 'Plano suelo', custom: 'Plano propio' };
+  toast(names[drawPlane.mode] || 'Plano');
+});
+
+// ── Atajos de teclado (extra para escritorio) ──
+document.addEventListener('keydown', (e) => {
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+  if (e.ctrlKey || e.metaKey) {
+    const key = e.key.toLowerCase(); // con Shift llega 'Z', no 'z'
+    if (key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+    else if ((key === 'z' && e.shiftKey) || key === 'y') { e.preventDefault(); redo(); }
+    return;
+  }
+  const tools = { b: 'brush', e: 'eraser', v: 'select', s: 'shapes', p: 'plane' };
+  const t = tools[e.key.toLowerCase()];
+  if (t) {
+    const st = getState();
+    setState({ activeTool: t, activeVariant: st.toolVariants[t] });
+  }
+});
+
+// Expuesto para las pruebas automáticas — no es parte de la app final
+window.__camCtl = camCtl;
+window.__strokeEngine = strokeEngine;
+window.__scene = scene;
+window.__store = { getState, setState };
+
+(function loop() {
+  planeGuide.update(camCtl.state.target);
+  gizmo.draw();
+  render();
+  requestAnimationFrame(loop);
+})();

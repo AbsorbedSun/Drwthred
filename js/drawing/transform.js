@@ -14,6 +14,7 @@ import * as THREE from '../vendor/three.module.js';
 import { getState } from '../core/store.js';
 import { pushAction } from '../core/history.js';
 import { planeFacingCamera, projectToPlane } from './plane-projection.js';
+import { isFixedPlane, normalOf, facingFactor } from './draw-planes.js';
 
 export function createTransformController({ scene, camera }) {
   let moveTarget = null, movePlane = null, moveAnchorPoint = null, moveStartPos = null;
@@ -36,7 +37,13 @@ export function createTransformController({ scene, camera }) {
   function startMove(ndcX, ndcY) {
     const target = currentSelection();
     if (!target) return false;
-    movePlane = planeFacingCamera(camera, target.position);
+    // Con un plano fijo activo, el objeto se desliza SOBRE ese plano
+    // (como en Feather); si el plano se ve de canto, se cae al plano de
+    // frente a la cámara para no mandarlo al infinito.
+    const spec = getState().drawPlane;
+    movePlane = isFixedPlane(spec) && facingFactor(spec, camera) > 0.2
+      ? new THREE.Plane().setFromNormalAndCoplanarPoint(normalOf(spec), target.position)
+      : planeFacingCamera(camera, target.position);
     const p = projectToPlane(camera, ndcX, ndcY, movePlane);
     if (!p) return false;
     moveTarget = target;
@@ -57,6 +64,11 @@ export function createTransformController({ scene, camera }) {
     if (!from.equals(to)) {
       pushAction({ undo: () => obj.position.copy(from), redo: () => obj.position.copy(to) });
     }
+    moveTarget = null; movePlane = null; moveAnchorPoint = null; moveStartPos = null;
+  }
+  function cancelMove() {
+    if (!moveTarget) return;
+    moveTarget.position.copy(moveStartPos);
     moveTarget = null; movePlane = null; moveAnchorPoint = null; moveStartPos = null;
   }
   function isMoving() { return moveTarget !== null; }
@@ -90,7 +102,8 @@ export function createTransformController({ scene, camera }) {
     const obj = scaleTarget;
     const fromScale = scaleStartScale, toScale = obj.scale.clone();
     const fromQuat = rotateStartQuat, toQuat = obj.quaternion.clone();
-    pushAction({
+    // Un toque de 2 dedos (= deshacer) no debe dejar una acción vacía en el historial
+    if (!fromScale.equals(toScale) || !fromQuat.equals(toQuat)) pushAction({
       undo: () => { obj.scale.copy(fromScale); obj.quaternion.copy(fromQuat); },
       redo: () => { obj.scale.copy(toScale); obj.quaternion.copy(toQuat); },
     });
@@ -100,7 +113,7 @@ export function createTransformController({ scene, camera }) {
 
   return {
     isActive, currentSelection,
-    startMove, moveTo, endMove, isMoving,
+    startMove, moveTo, endMove, cancelMove, isMoving,
     startScaleRotate, updateScaleRotate, endScaleRotate, isScalingRotating,
   };
 }

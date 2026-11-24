@@ -29,6 +29,15 @@ export function hitTestAt(scene, camera, ndcX, ndcY) {
   return hits.length ? hits[0].object.uuid : null;
 }
 
+/** Igual que hitTestAt, pero devuelve el PUNTO 3D tocado (o null). Lo
+ * usan el pincel en plano libre (anclar la profundidad a lo que se toca)
+ * y la herramienta Plano (llevar el plano hasta ese punto). */
+export function hitPointAt(scene, camera, ndcX, ndcY) {
+  raycaster.setFromCamera({ x: ndcX, y: ndcY }, camera);
+  const hits = raycaster.intersectObjects(selectableMeshes(scene).filter((o) => o.visible), false);
+  return hits.length ? hits[0].point.clone() : null;
+}
+
 export function selectAt(scene, camera, ndcX, ndcY) {
   const id = hitTestAt(scene, camera, ndcX, ndcY);
   setState({ selectedId: id });

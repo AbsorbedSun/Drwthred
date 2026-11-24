@@ -8,30 +8,27 @@
 // la que decide dónde vive cada cosa.
 // ============================================================================
 import { register } from '../hud-manager.js';
+import { attachPopover } from '../popover.js';
 import { getState, subscribe } from '../../core/store.js';
 import { saveView, applyView, deleteView } from '../../core/views.js';
 import { icon } from '../icons.js';
 
 export function createViewsPanel({ id, slot, order, camCtl }) {
-  const wrap = document.createElement('div');
-  wrap.className = 'hud-context-panel views-panel';
-
   const trigger = document.createElement('button');
-  trigger.className = 'hud-trigger';
+  trigger.className = 'hud-fab';
   trigger.innerHTML = icon('views');
   trigger.title = 'Vistas guardadas';
+  trigger.setAttribute('aria-label', 'Vistas guardadas');
 
   const panel = document.createElement('div');
-  panel.className = 'hud-panel-detail views-panel-detail';
-
-  wrap.append(trigger, panel);
+  panel.className = 'hud-panel views-panel';
 
   function render() {
     const { savedViews } = getState();
     panel.innerHTML = '';
 
     const title = document.createElement('div');
-    title.className = 'layers-title';
+    title.className = 'panel-title';
     title.textContent = 'VISTAS';
     panel.appendChild(title);
 
@@ -46,6 +43,7 @@ export function createViewsPanel({ id, slot, order, camCtl }) {
       name.textContent = view.name;
       name.title = 'Tocar para saltar a esta vista';
       name.addEventListener('click', () => applyView(camCtl, view.id));
+      row.addEventListener('click', () => applyView(camCtl, view.id));
 
       const del = document.createElement('button');
       del.className = 'layer-eye';
@@ -81,16 +79,8 @@ export function createViewsPanel({ id, slot, order, camCtl }) {
   subscribe(render);
   render();
 
-  function open() { wrap.classList.add('open'); }
-  function close() { wrap.classList.remove('open'); }
-  trigger.addEventListener('click', (e) => {
-    e.stopPropagation();
-    wrap.classList.contains('open') ? close() : open();
-  });
-  document.addEventListener('click', (e) => {
-    if (wrap.classList.contains('open') && !wrap.contains(e.target)) close();
-  });
+  attachPopover({ trigger, panel });
 
-  register({ id, slot, order, el: wrap });
-  return { el: wrap };
+  register({ id, slot, order, el: trigger });
+  return { el: trigger };
 }

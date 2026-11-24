@@ -4,30 +4,27 @@
 // vía drawing/layers.js, y se re-dibuja solo cuando el store cambia.
 // ============================================================================
 import { register } from '../hud-manager.js';
+import { attachPopover } from '../popover.js';
 import { getState, subscribe } from '../../core/store.js';
 import { addLayer, setActiveLayer, toggleLayerVisibility } from '../../drawing/layers.js';
 import { icon } from '../icons.js';
 
 export function createLayersPanel({ id, slot, order }) {
-  const wrap = document.createElement('div');
-  wrap.className = 'hud-context-panel layers-panel';
-
   const trigger = document.createElement('button');
-  trigger.className = 'hud-trigger';
+  trigger.className = 'hud-fab';
   trigger.innerHTML = icon('layers');
   trigger.title = 'Capas';
+  trigger.setAttribute('aria-label', 'Capas');
 
   const panel = document.createElement('div');
-  panel.className = 'hud-panel-detail layers-panel-detail';
-
-  wrap.append(trigger, panel);
+  panel.className = 'hud-panel layers-panel';
 
   function render() {
     const { layers, activeLayerId } = getState();
     panel.innerHTML = '';
 
     const title = document.createElement('div');
-    title.className = 'layers-title';
+    title.className = 'panel-title';
     title.textContent = 'CAPAS';
     panel.appendChild(title);
 
@@ -71,18 +68,9 @@ export function createLayersPanel({ id, slot, order }) {
   render();
 
   // Sin auto-cierre por tiempo: capas es un panel de trabajo — se puede
-  // tocar varias veces seguidas (agregar, ocultar, activar) y no tiene
-  // sentido que se cierre solo a mitad de esa secuencia.
-  function open() { wrap.classList.add('open'); }
-  function close() { wrap.classList.remove('open'); }
-  trigger.addEventListener('click', (e) => {
-    e.stopPropagation();
-    wrap.classList.contains('open') ? close() : open();
-  });
-  document.addEventListener('click', (e) => {
-    if (wrap.classList.contains('open') && !wrap.contains(e.target)) close();
-  });
+  // tocar varias veces seguidas (agregar, ocultar, activar).
+  attachPopover({ trigger, panel });
 
-  register({ id, slot, order, el: wrap });
-  return { el: wrap };
+  register({ id, slot, order, el: trigger });
+  return { el: trigger };
 }

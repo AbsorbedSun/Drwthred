@@ -4,29 +4,28 @@
 // viven en el store — por eso se arma en scene-demo.js.
 // ============================================================================
 import { register } from '../hud-manager.js';
+import { attachPopover } from '../popover.js';
 import { downloadProject, pickAndLoadProject, exportImage } from '../../persistence/save-load.js';
 import { icon } from '../icons.js';
 
 export function createFilePanel({ id, slot, order, scene, strokeEngine, renderer, onToast }) {
-  const wrap = document.createElement('div');
-  wrap.className = 'hud-context-panel file-panel';
-
   const trigger = document.createElement('button');
-  trigger.className = 'hud-trigger';
+  trigger.className = 'hud-fab';
   trigger.innerHTML = icon('save');
   trigger.title = 'Guardar / Cargar / Exportar';
+  trigger.setAttribute('aria-label', 'Archivo');
 
   const panel = document.createElement('div');
-  panel.className = 'hud-panel-detail file-panel-detail';
+  panel.className = 'hud-panel file-panel';
   panel.innerHTML = `
-    <button class="file-action" data-action="save">${icon('save')}<span>Guardar proyecto</span></button>
-    <button class="file-action" data-action="load">${icon('load')}<span>Cargar proyecto</span></button>
-    <button class="file-action" data-action="export">${icon('image')}<span>Exportar imagen</span></button>
+    <div class="panel-title">ARCHIVO</div>
+    <button class="panel-action" data-action="save">${icon('save')}<span>Guardar proyecto</span></button>
+    <button class="panel-action" data-action="load">${icon('load')}<span>Cargar proyecto</span></button>
+    <button class="panel-action" data-action="export">${icon('image')}<span>Exportar imagen</span></button>
   `;
-  wrap.append(trigger, panel);
 
   panel.addEventListener('click', (e) => {
-    const btn = e.target.closest('.file-action');
+    const btn = e.target.closest('.panel-action');
     if (!btn) return;
     e.stopPropagation();
     const action = btn.dataset.action;
@@ -41,19 +40,11 @@ export function createFilePanel({ id, slot, order, scene, strokeEngine, renderer
       exportImage(renderer);
       if (onToast) onToast('Imagen exportada');
     }
-    close();
+    pop.close();
   });
 
-  function open() { wrap.classList.add('open'); }
-  function close() { wrap.classList.remove('open'); }
-  trigger.addEventListener('click', (e) => {
-    e.stopPropagation();
-    wrap.classList.contains('open') ? close() : open();
-  });
-  document.addEventListener('click', (e) => {
-    if (wrap.classList.contains('open') && !wrap.contains(e.target)) close();
-  });
+  const pop = attachPopover({ trigger, panel });
 
-  register({ id, slot, order, el: wrap });
-  return { el: wrap };
+  register({ id, slot, order, el: trigger });
+  return { el: trigger };
 }

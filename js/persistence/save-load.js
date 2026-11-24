@@ -19,15 +19,21 @@ const FORMAT_VERSION = 1;
 export function serializeProject(scene) {
   const strokes = scene.children
     .filter((obj) => obj.userData && obj.userData.strokePoints)
-    .map((obj) => ({
-      layerId: obj.userData.layerId,
-      color: obj.userData.strokeColor,
-      width: obj.userData.strokeWidth,
-      points: obj.userData.strokePoints,
-    }));
+    .map((obj) => {
+      const s = {
+        layerId: obj.userData.layerId,
+        color: obj.userData.strokeColor,
+        width: obj.userData.strokeWidth,
+        points: obj.userData.strokePoints,
+      };
+      // Campos opcionales — un archivo sin ellos sigue siendo válido
+      if (obj.userData.strokePressures) s.pressures = obj.userData.strokePressures;
+      if (obj.userData.strokeFaceNormal) s.faceNormal = obj.userData.strokeFaceNormal;
+      return s;
+    });
 
-  const { layers, activeLayerId, savedViews } = getState();
-  return { version: FORMAT_VERSION, layers, activeLayerId, savedViews, strokes };
+  const { layers, activeLayerId, savedViews, drawPlane, mirror } = getState();
+  return { version: FORMAT_VERSION, layers, activeLayerId, savedViews, drawPlane, mirror, strokes };
 }
 
 /**
@@ -48,12 +54,18 @@ export function loadProject(scene, strokeEngine, data) {
     activeLayerId: data.activeLayerId,
     savedViews: data.savedViews || [],
   });
+  if (data.drawPlane) setState({ drawPlane: data.drawPlane });
+  if (typeof data.mirror === 'boolean') setState({ mirror: data.mirror });
 
   data.strokes.forEach((s) => {
     if (!s.points || s.points.length < 2) return;
     const pts = s.points.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
-    strokeEngine.startStroke(pts[0], { color: s.color, width: s.width, meta: { layerId: s.layerId } });
-    for (let i = 1; i < pts.length; i++) strokeEngine.addPoint(pts[i]);
+    const pr = s.pressures || [];
+    const faceNormal = s.faceNormal ? new THREE.Vector3().fromArray(s.faceNormal) : null;
+    strokeEngine.startStroke(pts[0], {
+      color: s.color, width: s.width, meta: { layerId: s.layerId }, pressure: pr[0] ?? 1, faceNormal,
+    });
+    for (let i = 1; i < pts.length; i++) strokeEngine.addPoint(pts[i], pr[i] ?? 1);
     strokeEngine.endStroke();
   });
 }
