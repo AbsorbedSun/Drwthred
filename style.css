@@ -1,4 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap');
+/* Fuentes incluidas en el proyecto (licencia OFL, ver fonts/OFL.txt): sin
+   internet la app se ve igual — antes venían de Google Fonts. */
+@font-face{font-family:'DM Sans';font-weight:400;font-display:swap;src:url(fonts/dm-sans-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'DM Sans';font-weight:500;font-display:swap;src:url(fonts/dm-sans-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'DM Sans';font-weight:700;font-display:swap;src:url(fonts/dm-sans-latin-700-normal.woff2) format('woff2')}
+@font-face{font-family:'DM Mono';font-weight:400;font-display:swap;src:url(fonts/dm-mono-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'DM Mono';font-weight:500;font-display:swap;src:url(fonts/dm-mono-latin-500-normal.woff2) format('woff2')}
 
 :root{
   /* Paleta oscura por defecto — hace juego con el lienzo 3D, que siempre
@@ -163,6 +169,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .seg-control button.active{background:var(--pan);box-shadow:0 1px 4px rgba(0,0,0,.2);font-weight:700}
 .switch-row{display:flex;align-items:center;justify-content:space-between;min-height:var(--btn);margin:10px 4px 4px;font-size:15px;cursor:pointer}
 .switch-row input{position:absolute;opacity:0;pointer-events:none}
+.switch-row > span:first-child{display:flex;flex-direction:column;gap:2px;padding-right:10px}
+.switch-row small{font-size:12px;color:var(--mut);line-height:1.35}
+.settings-panel{max-height:calc(100vh - 80px)}
 .switch{width:46px;height:28px;border-radius:14px;background:var(--bdr);position:relative;transition:background .15s;flex-shrink:0}
 .switch::after{content:'';position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .15s}
 .switch-row input:checked + .switch{background:var(--accent)}
@@ -170,6 +179,26 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .settings-panel{width:300px}
 
 /* Capas / vistas */
+.layers-panel{width:min(330px, calc(100vw - 16px))}
+.layer-item{display:flex;flex-direction:column}
+.layer-row{position:relative;transition:transform .12s ease}
+.layer-row.dragging{z-index:2;transition:none;background:var(--pan-2);box-shadow:0 6px 18px rgba(0,0,0,.3)}
+.layer-row.hidden .layer-name{opacity:.45}
+.layer-row.locked .layer-name{font-style:italic}
+.layer-icon{width:36px;height:40px;border:none;background:transparent;cursor:pointer;color:var(--mut);
+  flex-shrink:0;padding:0;display:flex;align-items:center;justify-content:center;border-radius:10px}
+.layer-icon.on{color:var(--accent)}
+.layer-grip{cursor:grab;touch-action:none;width:28px}
+.layer-name small{font-size:11px;color:var(--mut);font-family:var(--mono)}
+.layer-options{padding:6px 4px 10px 8px;display:flex;flex-direction:column;gap:8px}
+.layer-opacity{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--mut)}
+.layer-opacity input{flex:1;accent-color:var(--accent);height:32px}
+.layer-opacity output{font-family:var(--mono);font-size:12px;min-width:38px;text-align:right}
+.layer-actions{display:flex;gap:6px}
+.layer-action{flex:1;min-width:0;padding:0 6px;min-height:40px;border-radius:10px;border:1px solid var(--bdr);background:transparent;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px}
+.layer-action svg{width:16px;height:16px}
+.layer-action.danger{color:var(--side)}
 .layers-list{display:flex;flex-direction:column;gap:2px;margin-bottom:8px;max-height:min(46vh, 320px);overflow-y:auto}
 .layer-row{display:flex;align-items:center;gap:8px;min-height:var(--btn);padding:0 8px;border-radius:12px;cursor:pointer}
 .layer-row:active{background:color-mix(in srgb, var(--ink) 6%, transparent)}
@@ -252,16 +281,31 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .selbar-btn:active{transform:scale(.93);background:color-mix(in srgb, var(--ink) 8%, transparent)}
 .selbar-btn.danger{color:var(--side)}
 .selbar-close{min-width:44px}
+.selbar-pop{min-width:260px}
+.selbar-pop .variants-grid{width:min(312px, calc(100vw - 40px))}
 .selbar-swatch{position:absolute;top:7px;right:12px;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 1.5px var(--pan)}
 @media (max-width:640px), (max-height:520px){
   .selbar-btn{min-width:40px;height:44px}
   .selbar-btn span{display:none}
   .selbar-count{font-size:11px;padding:0 4px}
   .selbar-btn[aria-label="Plano aquí"]{display:none}
+  .hud-selbar.show{flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 16px)}
 }
 
+/* Hover del lápiz: dónde caería el trazo (y si el imán lo pegaría) */
+.hover-dot{
+  position:fixed;left:0;top:0;z-index:390;pointer-events:none;border-radius:50%;
+  border:1.5px solid color-mix(in srgb, var(--dot, #fff) 85%, transparent);
+  background:color-mix(in srgb, var(--dot, #fff) 18%, transparent);
+  box-shadow:0 0 0 1px rgba(0,0,0,.35);opacity:0;transition:opacity .12s;
+}
+.hover-dot.show{opacity:1}
+.hover-dot.snapped{border:2.5px solid var(--accent);background:color-mix(in srgb, var(--accent) 25%, transparent)}
 /* Contorno del lazo mientras se dibuja */
 .lasso-overlay{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:400}
+.snap-ring{fill:none;stroke:var(--accent);stroke-width:3;opacity:0;transform-box:fill-box;transform-origin:center}
+.snap-ring.show{animation:snap-pop .45s ease-out}
+@keyframes snap-pop{0%{opacity:1;transform:scale(.4)}100%{opacity:0;transform:scale(1.4)}}
 .lasso-overlay polyline{fill:color-mix(in srgb, var(--accent) 12%, transparent);stroke:var(--accent);stroke-width:2;stroke-dasharray:6 5;stroke-linejoin:round}
 
 /* ══════════ Gizmo de ejes ══════════ */
@@ -278,6 +322,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   display:flex;align-items:center;justify-content:center;padding:0;box-shadow:var(--shadow);
 }
 .gizmo-home svg{width:18px;height:18px}
+.gizmo-buttons{display:flex;gap:6px}
+.gizmo-proj.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 
 /* ══════════ Toast ══════════ */
 .hud-toast{
@@ -288,6 +334,37 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis;
 }
 .hud-toast.show{opacity:1;transform:translateY(0)}
+
+/* ══════════ Diálogos (confirmar, renombrar) ══════════ */
+.app-dialog{
+  position:fixed;inset:0;z-index:950;display:flex;align-items:center;justify-content:center;padding:16px;
+  background:rgba(8,7,5,.5);opacity:0;pointer-events:none;transition:opacity .15s;
+}
+.app-dialog.open{opacity:1;pointer-events:auto}
+.dialog-card{
+  width:min(400px, 100%);background:var(--pan);border:1px solid var(--bdr);border-radius:20px;padding:20px;
+  box-shadow:0 20px 60px rgba(0,0,0,.4);transform:scale(.96);transition:transform .15s;
+}
+.app-dialog.open .dialog-card{transform:none}
+.dialog-card h2{font-size:18px;margin:0 0 8px}
+.dialog-card p{font-size:14.5px;line-height:1.5;color:var(--mut);margin:0 0 14px}
+.dialog-input{
+  width:100%;min-height:var(--btn);border-radius:12px;border:1px solid var(--bdr);background:var(--pan-2);
+  color:var(--ink);font:inherit;font-size:16px;padding:0 12px;margin:4px 0 14px;
+}
+.dialog-input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.dialog-card .export-form{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.export-formats{flex-wrap:wrap}
+.export-formats button{min-width:45%}
+.export-hint{font-size:13px;color:var(--mut);margin:2px 2px 4px;min-height:18px}
+.export-opts[hidden]{display:none}
+.dialog-buttons{display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+.dialog-btn{min-height:var(--btn);padding:0 18px;border-radius:14px;border:1px solid var(--bdr);background:transparent;font-size:15px;cursor:pointer}
+.dialog-btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.dialog-btn.danger{background:var(--side);border-color:var(--side);color:#fff;font-weight:700}
+.panel-sep{height:1px;background:var(--bdr);margin:6px 4px}
+.panel-action.danger{color:var(--side)}
+.panel-footer{font-size:12px;color:var(--mut);margin:8px 4px 2px;font-family:var(--mono)}
 
 /* ══════════ Hoja de ayuda ══════════ */
 .help-sheet{

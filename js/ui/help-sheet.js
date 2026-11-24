@@ -6,7 +6,7 @@
 // ============================================================================
 import { icon } from './icons.js';
 
-const SEEN_KEY = 'drwthred.helpSeen.v3'; // v3: se vuelve a mostrar una vez con lo nuevo
+const SEEN_KEY = 'drwthred.helpSeen.v4'; // se vuelve a mostrar una vez cuando hay novedades
 
 const HTML = `
   <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="help-title">
@@ -59,7 +59,25 @@ const HTML = `
         <ul>
           <li><b>Selección → Lazo</b>: rodeá varios trazos y figuras</li>
           <li>Arrastrá algo seleccionado para mover todo el grupo; 2 dedos lo escalan y rotan</li>
-          <li>La barra de arriba: duplicar, pintar, espejar, cambiar de capa, eliminar</li>
+          <li>La barra de arriba: duplicar, pintar, grosor, pincel, espejar, cambiar de capa, eliminar</li>
+        </ul>
+      </section>
+      <section>
+        <h2>Ayudas al dibujar</h2>
+        <ul>
+          <li><b>Formas rápidas</b>: al terminar un trazo, quedate quieto un instante → línea, círculo, rectángulo…</li>
+          <li><b>Imán</b>: las puntas se pegan a otros trazos (un anillo avisa)</li>
+          <li>Acercá el lápiz sin tocar: un círculo muestra dónde caerá el trazo</li>
+          <li>Botón junto al gizmo: vista <b>ortográfica</b> (sin perspectiva)</li>
+        </ul>
+      </section>
+      <section>
+        <h2>Archivo</h2>
+        <ul>
+          <li>Tu dibujo se <b>guarda solo</b> y vuelve al abrir la app</li>
+          <li><b>Imagen de referencia</b>: una foto sobre el plano, para calcar</li>
+          <li><b>Exportar</b>: imagen PNG, o 3D (GLB, USDZ para realidad aumentada en iPad, OBJ)</li>
+          <li>Desde el navegador: "Agregar a pantalla de inicio" la instala y funciona sin internet</li>
         </ul>
       </section>
     </div>

@@ -88,6 +88,8 @@ export function attachPopover({ trigger, panel, placement = 'auto', toggleOnTrig
   document.addEventListener('pointerdown', (e) => {
     if (!isOpen) return;
     if (panel.contains(e.target) || trigger.contains(e.target)) return;
+    // Un diálogo abierto desde el panel (renombrar, confirmar) no lo cierra
+    if (e.target.closest && e.target.closest('.app-dialog')) return;
     api.close();
     if (e.target && e.target.id === 'scene-canvas') { e.stopPropagation(); e.preventDefault(); }
   }, true);

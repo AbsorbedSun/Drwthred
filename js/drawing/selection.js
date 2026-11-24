@@ -11,13 +11,14 @@
 // ============================================================================
 import * as THREE from '../vendor/three.module.js';
 import { getState, setState, subscribe } from '../core/store.js';
+import { isLockedObject } from './layers.js';
 
 const raycaster = new THREE.Raycaster();
 const HIGHLIGHT_COLOR = 0x4fd1c5;
 const originalColors = new Map(); // mesh -> color hex original, para restaurar al deseleccionar
 
 export function isSelectable(o) {
-  return !!(o.userData && (o.userData.strokePoints || o.userData.primitiveKind));
+  return !!(o.userData && (o.userData.strokePoints || o.userData.primitiveKind || o.userData.reference));
 }
 export function selectableMeshes(scene) {
   return scene.children.filter(isSelectable);
@@ -33,8 +34,11 @@ function pickable(scene, filter) {
 /** Hit-test puro, sin efectos secundarios — no toca el store. */
 export function hitTestAt(scene, camera, ndcX, ndcY) {
   raycaster.setFromCamera({ x: ndcX, y: ndcY }, camera);
-  const hits = raycaster.intersectObjects(pickable(scene), false);
-  return hits.length ? hits[0].object.uuid : null;
+  // Lo de capas bloqueadas no se puede agarrar
+  const hits = raycaster.intersectObjects(pickable(scene, (o) => !isLockedObject(o)), false);
+  // Lo dibujado gana sobre la imagen de referencia que tenga detrás
+  const hit = hits.find((h) => !h.object.userData.reference) || hits[0];
+  return hit ? hit.object.uuid : null;
 }
 
 /** Igual que hitTestAt, pero devuelve el PUNTO 3D tocado (o null). */
@@ -70,7 +74,7 @@ export function getSelectedIds(state = getState()) {
 export function selectedObjects(scene, state = getState()) {
   const ids = new Set(getSelectedIds(state));
   if (!ids.size) return [];
-  return scene.children.filter((o) => ids.has(o.uuid));
+  return scene.children.filter((o) => ids.has(o.uuid) && !isLockedObject(o, state));
 }
 
 export function setSelection(ids) {
@@ -134,7 +138,7 @@ export function objectsInLasso(scene, camera, polygon, minFraction = 0.5) {
   if (!polygon || polygon.length < 3) return [];
   camera.updateMatrixWorld();
   return selectableMeshes(scene).filter((o) => {
-    if (!o.visible) return false;
+    if (!o.visible || isLockedObject(o)) return false;
     const pts = samplePoints(o);
     let inside = 0, total = 0;
     for (const p of pts) {

@@ -123,7 +123,7 @@ export function createPlaneBar({ id = 'plane-bar', order = 1, camCtl, camera, sc
     // Mirar el plano desde el lado donde ya está la cámara (no dar media vuelta)
     const toCam = new THREE.Vector3().subVectors(camera.position, camCtl.state.target);
     if (toCam.dot(n) < 0) n = n.negate();
-    camCtl.viewAlong(n);
+    camCtl.viewAlong(n, undefined, { ortho: getState().autoOrtho });
   }
 
   function render({ drawPlane, mirror }) {

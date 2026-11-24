@@ -323,6 +323,31 @@ export function createStrokeEngine(scene, camera) {
     geo.setDrawRange(0, (n - 1) * 6);
   }
 
+  /** Puntos del trazo en curso tal como los marcó el usuario (crudos si hay curvas). */
+  function currentPoints() {
+    if (!current) return [];
+    return current.raw ? current.raw.map((r) => r.p.clone()) : current.points.map((p) => p.clone());
+  }
+
+  /**
+   * Reemplaza el trazo en curso por otros puntos (forma rápida): se dibuja
+   * tal cual, sin curvas ni normales de superficie, con presión pareja.
+   */
+  function replaceCurrent(points, pressure = 1) {
+    const c = current;
+    if (!c || points.length < 2) return false;
+    c.raw = null;
+    c.points = points.map((p) => p.clone());
+    c.widths = c.points.map(() => pressure);
+    c.normals = c.points.map(() => null);
+    c.hasNormals = false;
+    c.lengths = [0];
+    for (let i = 1; i < c.points.length; i++) c.lengths.push(c.lengths[i - 1] + c.points[i].distanceTo(c.points[i - 1]));
+    c.variable = pressure !== 1;
+    updateLiveMesh(c, true, 0);
+    return true;
+  }
+
   /** Descarta el trazo en curso sin dejar rastro (ej: era el primer dedo de un gesto de navegación). */
   function cancelStroke() {
     if (!current) return;
@@ -373,7 +398,7 @@ export function createStrokeEngine(scene, camera) {
     return current !== null;
   }
 
-  return { startStroke, addPoint, endStroke, cancelStroke, isDrawing, finished };
+  return { startStroke, addPoint, endStroke, cancelStroke, isDrawing, currentPoints, replaceCurrent, finished };
 }
 
 export function centroidOf(points) {

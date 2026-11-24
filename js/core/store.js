@@ -16,7 +16,7 @@ let state = {
   activeVariant: 'pencil',
   brushColor: '#ffffff',
   brushWidth: 0.012,
-  layers: [{ id: 'layer-1', name: 'Capa 1', visible: true }],
+  layers: [{ id: 'layer-1', name: 'Capa 1', visible: true, locked: false, opacity: 1 }],
   activeLayerId: 'layer-1',
   savedViews: [],
   // Selección: `selectedIds` es la lista real (el lazo selecciona varios);
@@ -43,6 +43,9 @@ let state = {
   penDetected: false,
   pressure: true,            // el lápiz modula el grosor con la presión
   smoothing: 0.35,           // 0 = sin suavizado, ~0.7 = muy suave
+  quickShapes: true,         // mantener quieto al final del trazo → forma perfecta
+  snapping: true,            // las puntas del trazo se pegan a otros trazos cercanos
+  autoOrtho: true,           // al alinear con un plano/eje, vista ortográfica
 };
 
 const listeners = new Set();

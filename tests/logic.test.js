@@ -137,7 +137,7 @@ const strokes = (scene) => scene.children.filter((o) => o.userData.strokePoints)
   setState({ selectedId: cube.uuid }); // resaltada: el color guardado debe ser el real
 
   const data = JSON.parse(JSON.stringify(serializeProject(scene)));
-  assert(data.version === 2, 'formato v2');
+  assert(data.version === 3, 'formato actual (v3)');
   assert(data.primitives.length === 1 && data.primitives[0].color === '#123456', 'se guardan las figuras con su color real');
   assert(data.strokes[0].transform, 'el trazo transformado guarda su transformación');
 

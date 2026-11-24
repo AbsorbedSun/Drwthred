@@ -1,0 +1,19 @@
+{
+  "name": "drwthred",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Dibujo 3D sobre planos, pensado para tablet y lápiz. Sitio estático: no necesita compilación.",
+  "type": "module",
+  "scripts": {
+    "start": "node tools/serve.mjs 8080",
+    "test": "node tests/run-all.mjs",
+    "test:e2e": "node tests/e2e/app.e2e.mjs",
+    "update-sw": "node tools/update-sw.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

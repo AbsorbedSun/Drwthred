@@ -30,7 +30,7 @@ const TAP_MAX_MS = 280;
 const TAP_MAX_MOVE_PX = 14;
 const CANCEL_STROKE_MS = 260;
 
-export function attachGestures(el, { camCtl, router, transform, isPenMode, onPenDetected, onUndo, onRedo, onActivity }) {
+export function attachGestures(el, { camCtl, router, transform, isPenMode, onPenDetected, onUndo, onRedo, onActivity, onHover }) {
   const pointers = new Map(); // pointerId -> {x, y, sx, sy}  (solo dedos que cuentan)
   const ignored = new Set();  // dedos apoyados mientras el lápiz dibujaba (palma)
   let penId = null;
@@ -127,6 +127,7 @@ export function attachGestures(el, { camCtl, router, transform, isPenMode, onPen
 
   // ───────────────────────── pointerdown ─────────────────────────
   function onDown(e) {
+    if (onHover) onHover(null);
     if (onActivity) onActivity();
     try { el.setPointerCapture(e.pointerId); } catch (err) { /* no crítico */ }
 
@@ -183,6 +184,12 @@ export function attachGestures(el, { camCtl, router, transform, isPenMode, onPen
 
   // ───────────────────────── pointermove ─────────────────────────
   function onMove(e) {
+    // Hover: lápiz (iPad con hover) o mouse moviéndose SIN tocar/apretar
+    if (onHover && (e.pointerType === 'pen' || e.pointerType === 'mouse') && e.buttons === 0 &&
+        e.pointerId !== penId && !pointers.has(e.pointerId) && !mouseNav) {
+      onHover(toNDC(e.clientX, e.clientY));
+      return;
+    }
     if (onActivity) onActivity();
     if (mouseNav && e.pointerType === 'mouse') {
       const dx = e.clientX - mouseNav.x, dy = e.clientY - mouseNav.y;
@@ -282,6 +289,8 @@ export function attachGestures(el, { camCtl, router, transform, isPenMode, onPen
   }
   const onCancel = (e) => onUp(e, true);
   const onContext = (e) => e.preventDefault();
+  const onLeave = (e) => { if (onHover && (e.pointerType === 'pen' || e.pointerType === 'mouse')) onHover(null); };
+  el.addEventListener('pointerleave', onLeave);
 
   el.addEventListener('pointerdown', onDown);
   el.addEventListener('pointermove', onMove);

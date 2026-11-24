@@ -1,0 +1,29 @@
+# Corre todas las pruebas en cada push y pull request.
+# - Unitarias (Node, sin navegador): rápidas, más de 500 comprobaciones.
+# - Integración (la app real en Chromium con Playwright).
+name: Pruebas
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unitarias:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+
+  integracion:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e

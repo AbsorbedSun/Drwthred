@@ -18,6 +18,11 @@ import {
   duplicateObjects, deleteObjects, recolorObjects, mirrorObjects, moveObjectsToLayer,
 } from '../../drawing/object-actions.js';
 import { groupPivot } from '../../drawing/transform.js';
+import { restyleStrokes } from '../../drawing/object-actions.js';
+import { BRUSHES, getBrush } from '../../drawing/brushes.js';
+import { setReferenceOpacity } from '../../drawing/references.js';
+import { attachPopover } from '../popover.js';
+import { widthToT, tToWidth } from './size-slider.js';
 import { planeThroughPoint } from '../../drawing/draw-planes.js';
 
 export function createSelectionBar({ id = 'selection-bar', scene, camera, camCtl, onToast }) {
@@ -32,6 +37,73 @@ export function createSelectionBar({ id = 'selection-bar', scene, camera, camCtl
 
   const toast = (m) => onToast && onToast(m);
   const objs = () => selectedObjects(scene).filter((o) => o.visible);
+  const hasStrokes = (list) => list.some((o) => o.userData.strokePoints);
+  const hasRefs = (list) => list.some((o) => o.userData.reference);
+  const strokesOf = (list) => list.filter((o) => o.userData.strokePoints);
+
+  function title(text) {
+    const t = document.createElement('div');
+    t.className = 'panel-title';
+    t.textContent = text;
+    return t;
+  }
+
+  /** Grosor de los trazos seleccionados (misma escala que el slider). */
+  function widthPanel(list) {
+    const box = document.createElement('div');
+    const strokes = strokesOf(list);
+    const w0 = strokes[0] ? strokes[0].userData.strokeWidth : getState().brushWidth;
+    const row = document.createElement('label');
+    row.className = 'layer-opacity';
+    row.innerHTML = `<span>Grosor</span><input type="range" min="0" max="1000" value="${Math.round(widthToT(w0) * 1000)}"><output>${Math.round(w0 * 1000)}</output>`;
+    const range = row.querySelector('input'), out = row.querySelector('output');
+    range.addEventListener('input', () => { out.textContent = Math.round(tToWidth(range.value / 1000) * 1000); });
+    range.addEventListener('change', () => {
+      restyleStrokes(objs(), camera, { width: +tToWidth(range.value / 1000).toFixed(4) });
+      toast(strokes.length > 1 ? `Grosor de ${strokes.length} trazos cambiado` : 'Grosor cambiado');
+    });
+    box.append(title(strokes.length > 1 ? `GROSOR · ${strokes.length} TRAZOS` : 'GROSOR'), row);
+    return box;
+  }
+
+  /** Cambiar el pincel de los trazos seleccionados. */
+  function brushPanel(list, close) {
+    const box = document.createElement('div');
+    box.className = 'variants-grid';
+    const current = strokesOf(list).map((o) => getBrush(o.userData.brush).id);
+    box.appendChild(title('CAMBIAR PINCEL'));
+    BRUSHES.forEach((br) => {
+      const t = document.createElement('button');
+      t.className = 'variant-tile' + (current.length && current.every((c) => c === br.id) ? ' active' : '');
+      t.innerHTML = `${icon(br.icon)}<span>${br.label}</span>`;
+      t.addEventListener('click', (e) => {
+        e.stopPropagation();
+        restyleStrokes(objs(), camera, { brush: br.id });
+        toast(`Pincel: ${br.label}`);
+        close();
+      });
+      box.appendChild(t);
+    });
+    return box;
+  }
+
+  /** Opacidad de las imágenes de referencia seleccionadas. */
+  function opacityPanel(list) {
+    const box = document.createElement('div');
+    const refs = list.filter((o) => o.userData.reference);
+    const v0 = refs[0] ? refs[0].userData.refOpacity : 0.6;
+    const row = document.createElement('label');
+    row.className = 'layer-opacity';
+    row.innerHTML = `<span>Opacidad</span><input type="range" min="5" max="100" value="${Math.round(v0 * 100)}"><output>${Math.round(v0 * 100)}%</output>`;
+    const range = row.querySelector('input'), out = row.querySelector('output');
+    range.addEventListener('input', () => {
+      out.textContent = `${range.value}%`;
+      setReferenceOpacity(refs, range.value / 100, { record: false });
+    });
+    range.addEventListener('change', () => setReferenceOpacity(refs, range.value / 100, { record: true, from: v0 }));
+    box.append(title('IMAGEN DE REFERENCIA'), row);
+    return box;
+  }
 
   const ACTIONS = [
     { id: 'duplicate', icon: 'duplicate', label: 'Duplicar', run(list) {
@@ -46,6 +118,9 @@ export function createSelectionBar({ id = 'selection-bar', scene, camera, camCtl
       if (recolorObjects(list, getState().brushColor)) toast('Pintado con el color actual');
       else toast('Ya tiene ese color — elegí otro en la paleta');
     } },
+    { id: 'width', icon: 'strokeWidth', label: 'Grosor', when: hasStrokes, popover: widthPanel },
+    { id: 'brush', icon: 'softBrush', label: 'Pincel', when: hasStrokes, popover: brushPanel },
+    { id: 'opacity', icon: 'image', label: 'Opacidad', when: hasRefs, popover: opacityPanel },
     { id: 'mirror', icon: 'mirror', label: 'Espejar', run(list) { mirrorObjects(list); } },
     { id: 'layer', icon: 'toLayer', label: 'A capa', run(list) {
       const layer = getState().layers.find((l) => l.id === getState().activeLayerId);
@@ -68,13 +143,23 @@ export function createSelectionBar({ id = 'selection-bar', scene, camera, camCtl
     b.title = a.label;
     b.setAttribute('aria-label', a.label);
     b.innerHTML = `${icon(a.icon)}${a.swatch ? '<i class="selbar-swatch"></i>' : ''}<span>${a.label}</span>`;
-    b.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const list = objs();
-      if (list.length) a.run(list);
-    });
+    if (a.popover) {
+      // Acciones con ajuste (grosor, pincel, opacidad): abren un panelcito
+      const panel = document.createElement('div');
+      panel.className = 'hud-panel selbar-pop';
+      const pop = attachPopover({ trigger: b, panel, onOpen: () => {
+        panel.innerHTML = '';
+        panel.appendChild(a.popover(objs(), () => pop.close()));
+      } });
+    } else {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const list = objs();
+        if (list.length) a.run(list);
+      });
+    }
     bar.appendChild(b);
-    return b;
+    return { a, b };
   });
 
   const close = document.createElement('button');
@@ -86,7 +171,9 @@ export function createSelectionBar({ id = 'selection-bar', scene, camera, camCtl
   bar.appendChild(close);
 
   function render() {
-    const n = objs().length;
+    const list = objs();
+    const n = list.length;
+    buttons.forEach(({ a, b }) => { b.style.display = !a.when || a.when(list) ? '' : 'none'; });
     bar.classList.toggle('show', n > 0);
     count.textContent = n === 1 ? '1 objeto' : `${n} objetos`;
     const sw = bar.querySelector('.selbar-swatch');

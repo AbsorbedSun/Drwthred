@@ -33,6 +33,8 @@ import { placePrimitive } from '../drawing/primitives.js';
 import { hitTestAt, hitPointAt, surfaceHitAt, getSelectedIds, setSelection, objectsInLasso } from '../drawing/selection.js';
 import { pushAction } from '../core/history.js';
 import { getBrush } from '../drawing/brushes.js';
+import { recognizeShape } from '../drawing/shape-recognition.js';
+import { findSnapTarget } from '../drawing/snapping.js';
 import * as THREE from '../vendor/three.module.js';
 
 const TAP_THRESHOLD = 0.03;   // en NDC — por debajo de esto, "onEnd" cuenta como toque, no arrastre
@@ -45,7 +47,18 @@ export function pressureFactor(pressure, enabled = true) {
   return Math.min(1.7, Math.max(0.15, 0.15 + 1.7 * pressure)); // 0.5 ≈ grosor nominal
 }
 
-export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEngine = null, transform, onNotice = null, onLasso = null }) {
+const HOLD_MS = 550;        // quieto este tiempo al final del trazo → forma rápida
+const HOLD_JITTER = 0.008; // movimiento (NDC) que no cuenta como "moverse" (pulso)
+
+/**
+ * @param {Function} [o.onSnap]   - ({x,y} NDC) se pegó una punta: feedback visual
+ * @param {Function} [o.onChange] - la escena cambió fuera de un evento (forma rápida por tiempo)
+ * @param {Function} [o.viewport] - () => {w,h} del lienzo en px (el imán mide en px)
+ */
+export function createToolRouter({
+  scene, camera, camCtl, strokeEngine, mirrorEngine = null, transform,
+  onNotice = null, onLasso = null, onSnap = null, onChange = null, viewport = null,
+}) {
   let mode = null;
   let active = false;
   let drawPlane = null;
@@ -59,6 +72,9 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
   let lasso = null;       // contorno del lazo en NDC
   let planeRot = null;    // { startSpec, n0, pivot }
   let dropped = 0;        // puntos descartados por caer demasiado lejos (plano casi de canto)
+  let holdTimer = null;   // formas rápidas: espera de "quieto"
+  let holdNdc = null;
+  let shaped = false;     // el trazo ya se convirtió en forma: se ignoran los movimientos
 
   function isDrawing() {
     return active;
@@ -79,6 +95,11 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
     mode = activeTool;
 
     const layer = st.layers.find((l) => l.id === activeLayerId);
+    if ((activeTool === 'brush' || activeTool === 'shapes') && layer && layer.locked) {
+      mode = 'blocked';
+      if (onNotice) onNotice(`"${layer.name}" está bloqueada — desbloqueala en Capas para dibujar en ella`);
+      return;
+    }
     if ((activeTool === 'brush' || activeTool === 'shapes') && layer && !layer.visible) {
       // Dibujar en una capa oculta creaba trazos visibles "fantasma" que
       // desaparecían al tocar cualquier capa.
@@ -105,7 +126,13 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
         drawPlane = surface.fallback;
         first = hit ? { p: hit.point.addScaledVector(hit.normal, surface.lift), n: hit.normal } : null;
       } else {
-        if (!isFixedPlane(spec)) {
+        // Imán: empezar sobre la punta (o el cuerpo) de otro trazo
+        const snap = st.snapping && viewport ? findSnapTarget(scene, camera, { ndc: { x: ndcX, y: ndcY }, viewport: viewport() }) : null;
+        if (snap) {
+          anchor = snap.point;
+          first = { p: snap.point.clone(), n: null };
+          if (onSnap) onSnap(snap.ndc);
+        } else if (!isFixedPlane(spec)) {
           const hp = hitPointAt(scene, camera, ndcX, ndcY);
           if (hp) anchor = hp;
         }
@@ -249,7 +276,9 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
     }
 
     if (mode === 'brush') {
+      if (shaped) return; // ya es una forma perfecta: el resto del gesto no la deforma
       addBrushPoint(ndcX, ndcY, pressure);
+      armHold(ndcX, ndcY);
     } else if (mode === 'eraser') {
       eraseAt(ndcX, ndcY, getState().activeVariant);
     } else if (mode === 'moving' && transform) {
@@ -269,6 +298,43 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
         : dy * camCtl.state.radius * 0.5; // plano visto de frente: arrastre vertical
       setPlaneOffset(planeDrag.startOffset + delta);
     }
+  }
+
+  // ── Formas rápidas ──
+  function armHold(x, y) {
+    if (!getState().quickShapes || surface) return;
+    if (holdNdc && Math.hypot(x - holdNdc.x, y - holdNdc.y) < HOLD_JITTER) return; // pulso: sigue contando
+    holdNdc = { x, y };
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(tryQuickShape, HOLD_MS);
+  }
+
+  /** Base 2D del plano de dibujo: u = "derecha" de la pantalla apoyada en el plano. */
+  function planeBasis(n) {
+    const u = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    u.addScaledVector(n, -u.dot(n));
+    if (u.lengthSq() < 1e-8) u.set(0, 1, 0).addScaledVector(n, -n.y);
+    u.normalize();
+    return { u, v: new THREE.Vector3().crossVectors(n, u).normalize() };
+  }
+
+  function tryQuickShape() {
+    holdTimer = null;
+    if (mode !== 'brush' || shaped || !drawPlane) return;
+    const pts = strokeEngine.currentPoints();
+    if (pts.length < 6) return;
+    const n = drawPlane.normal.clone().normalize();
+    const { u, v } = planeBasis(n);
+    const o = pts[0];
+    const d = new THREE.Vector3();
+    const res = recognizeShape(pts.map((p) => { d.subVectors(p, o); return { x: d.dot(u), y: d.dot(v) }; }));
+    if (!res) return;
+    const pts3 = res.points.map((q) => o.clone().addScaledVector(u, q.x).addScaledVector(v, q.y));
+    if (!strokeEngine.replaceCurrent(pts3)) return;
+    if (usedMirror) mirrorEngine.replaceCurrent(pts3.map(mirrorPoint));
+    shaped = true;
+    if (onNotice) onNotice(`Forma: ${res.label}`);
+    if (onChange) onChange();
   }
 
   function finishBrush() {
@@ -294,9 +360,21 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
     if (mode === 'eraser' && eraseBatch) {
       eraseBatch.commit();
     } else if (mode === 'brush') {
-      // Con suavizado, la cinta va "atrás" del puntero — el último punto
-      // real se agrega crudo para que el trazo termine donde se soltó.
-      if (hasCoords) addBrushPoint(ndcX, ndcY, pressure, true);
+      if (!shaped && hasCoords) {
+        // Imán al final: la punta se pega exacta al otro trazo
+        const st = getState();
+        const snap = st.snapping && viewport ? findSnapTarget(scene, camera, { ndc: { x: ndcX, y: ndcY }, viewport: viewport() }) : null;
+        if (snap) {
+          const pf = pressureFactor(pressure, st.pressure);
+          strokeEngine.addPoint(snap.point, pf);
+          if (usedMirror) mirrorEngine.addPoint(mirrorPoint(snap.point), pf);
+          if (onSnap) onSnap(snap.ndc);
+        } else {
+          // Con suavizado, la cinta va "atrás" del puntero — el último punto
+          // real se agrega crudo para que el trazo termine donde se soltó.
+          addBrushPoint(ndcX, ndcY, pressure, true);
+        }
+      }
       finishBrush();
     } else if (mode === 'moving' && transform) {
       transform.endMove();
@@ -365,7 +443,34 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
     lasso = null;
     planeRot = null;
     dropped = 0;
+    clearTimeout(holdTimer);
+    holdTimer = null;
+    holdNdc = null;
+    shaped = false;
   }
 
-  return { isDrawing, onStart, onMove, onEnd, cancel, isTrivial };
+  /**
+   * Vista previa del hover (lápiz cerca de la pantalla, sin tocar): dónde
+   * caería el trazo y si el imán lo pegaría a otro. No cambia nada.
+   * @returns {{point: THREE.Vector3, snapped: boolean}|null}
+   */
+  function hoverInfo(ndcX, ndcY) {
+    const st = getState();
+    if (st.activeTool !== 'brush' || active) return null;
+    const spec = st.drawPlane;
+    if (isSurfaceMode(spec)) {
+      const hit = surfaceHitAt(scene, camera, ndcX, ndcY);
+      return hit ? { point: hit.point, snapped: false } : null;
+    }
+    if (st.snapping && viewport) {
+      const snap = findSnapTarget(scene, camera, { ndc: { x: ndcX, y: ndcY }, viewport: viewport() });
+      if (snap) return { point: snap.point, snapped: true };
+    }
+    if (isFixedPlane(spec) && facingFactor(spec, camera) < EDGE_ON_LIMIT) return null;
+    const anchor = (!isFixedPlane(spec) && hitPointAt(scene, camera, ndcX, ndcY)) || camCtl.state.target;
+    const p = projectToPlane(camera, ndcX, ndcY, resolvePlane(spec, camera, anchor));
+    return p && p.distanceTo(camera.position) < MAX_PROJECT_DIST ? { point: p, snapped: false } : null;
+  }
+
+  return { isDrawing, onStart, onMove, onEnd, cancel, isTrivial, hoverInfo };
 }

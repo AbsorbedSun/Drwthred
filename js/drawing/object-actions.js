@@ -11,6 +11,8 @@ import { getState, setState } from '../core/store.js';
 import { pushAction } from '../core/history.js';
 import { setSelection, objectColor, setObjectColor } from './selection.js';
 import { snapshot, recordTransform, groupPivot } from './transform.js';
+import { buildRibbonGeometry, centroidOf } from './stroke-engine.js';
+import { getBrush, createBrushMaterial } from './brushes.js';
 
 /**
  * Duplica los objetos, corridos `offset` (mundo), y deja seleccionadas las copias.
@@ -104,5 +106,52 @@ export function moveObjectsToLayer(objs, layerId = getState().activeLayerId) {
   });
   apply(moving.map(() => layerId));
   pushAction({ undo: () => apply(before), redo: () => apply(moving.map(() => layerId)) });
+  return true;
+}
+
+/**
+ * Cambia el grosor y/o el pincel de los TRAZOS seleccionados (las figuras
+ * se ignoran). Cada trazo se reconstruye con su receta nueva conservando
+ * forma, posición/rotación/escala, color y capa. Un solo paso de deshacer.
+ * @param {Object} change - { width?: number, brush?: string }
+ */
+export function restyleStrokes(objs, camera, { width = null, brush = null } = {}) {
+  const strokes = objs.filter((o) => o.userData && o.userData.strokePoints);
+  if (!strokes.length) return false;
+  const swaps = strokes.map((m) => {
+    const ud = m.userData;
+    const before = { geometry: m.geometry, material: m.material, userData: { ...ud } };
+    const nextUd = { ...ud };
+    if (width != null) nextUd.strokeWidth = width;
+    if (brush != null) nextUd.brush = brush;
+    const b = nextUd.brush ? getBrush(nextUd.brush) : null;
+    if (!(b && b.nib)) delete nextUd.strokeNib;
+    else if (!nextUd.strokeNib) nextUd.strokeNib = [Math.SQRT1_2, Math.SQRT1_2, 0];
+
+    const pts = ud.strokePoints.map((p) => new THREE.Vector3(p[0], p[1], p[2]));
+    const c0 = centroidOf(pts);
+    // Cámara en el marco original del trazo (para las cintas que la miran)
+    m.updateMatrixWorld();
+    const cam = m.worldToLocal(camera.position.clone()).add(c0);
+    const geo = buildRibbonGeometry(pts, nextUd.strokeWidth, cam, {
+      widths: ud.strokePressures || null,
+      faceNormal: ud.strokeFaceNormal ? new THREE.Vector3().fromArray(ud.strokeFaceNormal) : null,
+      normals: ud.strokeNormals ? ud.strokeNormals.map((n) => (n ? new THREE.Vector3().fromArray(n) : null)) : null,
+      brush: b,
+      nib: nextUd.strokeNib ? new THREE.Vector3().fromArray(nextUd.strokeNib) : null,
+    });
+    geo.translate(-c0.x, -c0.y, -c0.z);
+    const mat = createBrushMaterial(b, objectColor(m));
+    // Si estaba resaltado (seleccionado), el material nuevo también
+    if (m.material.color.getHex() !== objectColor(m)) mat.color.copy(m.material.color);
+    return { m, before, after: { geometry: geo, material: mat, userData: nextUd } };
+  });
+  const apply = (key) => swaps.forEach((s) => {
+    s.m.geometry = s[key].geometry;
+    s.m.material = s[key].material;
+    s.m.userData = { ...s[key].userData };
+  });
+  apply('after');
+  pushAction({ undo: () => apply('before'), redo: () => apply('after') });
   return true;
 }

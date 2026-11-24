@@ -12,6 +12,7 @@
 import * as THREE from '../../vendor/three.module.js';
 import { register, isNarrow } from '../hud-manager.js';
 import { icon } from '../icons.js';
+import { getState } from '../../core/store.js';
 
 const AXES = [
   { v: new THREE.Vector3(1, 0, 0), color: '#e8655a', label: 'X' },
@@ -29,8 +30,25 @@ export function createNavGizmo({ id = 'nav-gizmo', camCtl, camera }) {
   home.className = 'gizmo-home';
   home.title = 'Vista inicial';
   home.innerHTML = icon('home');
-  home.addEventListener('click', (e) => { e.stopPropagation(); camCtl.reset(); });
-  wrap.append(canvas, home);
+  home.addEventListener('click', (e) => { e.stopPropagation(); camCtl.setOrtho(false); camCtl.reset(); });
+
+  // Perspectiva ↔ ortográfica (sin perspectiva: medidas y paralelas exactas)
+  const proj = document.createElement('button');
+  proj.className = 'gizmo-home gizmo-proj';
+  const syncProj = () => {
+    const o = camCtl.isOrtho();
+    proj.innerHTML = icon(o ? 'orthoView' : 'perspView');
+    proj.title = o ? 'Vista ortográfica (tocar para perspectiva)' : 'Vista en perspectiva (tocar para ortográfica)';
+    proj.setAttribute('aria-label', proj.title);
+    proj.classList.toggle('on', o);
+  };
+  proj.addEventListener('click', (e) => { e.stopPropagation(); camCtl.toggleOrtho(); });
+  camCtl.onProjectionChange(syncProj);
+  syncProj();
+  const buttons = document.createElement('div');
+  buttons.className = 'gizmo-buttons';
+  buttons.append(proj, home);
+  wrap.append(canvas, buttons);
 
   const ctx = canvas.getContext('2d');
   let size = 0, dpr = 0;
@@ -130,7 +148,7 @@ export function createNavGizmo({ id = 'nav-gizmo', camCtl, camera }) {
       const d = Math.hypot(it.x - x, it.y - y) - (it.z > 0 ? 3 : 0);
       if (d < bestD) { bestD = d; best = it; }
     }
-    if (best) camCtl.viewAlong(best.dir);
+    if (best) camCtl.viewAlong(best.dir, undefined, { ortho: getState().autoOrtho });
   };
   canvas.addEventListener('pointerup', end);
   canvas.addEventListener('pointercancel', end);

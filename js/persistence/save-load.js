@@ -19,11 +19,16 @@ import * as THREE from '../vendor/three.module.js';
 import { getState, setState } from '../core/store.js';
 import { clearHistory } from '../core/history.js';
 import { placePrimitive } from '../drawing/primitives.js';
+import { normalizeLayer } from '../drawing/layers.js';
+import { serializeReferences, loadReferences } from '../drawing/references.js';
 
-const FORMAT_VERSION = 2;
-const SUPPORTED = [1, 2];
+// v3: capas con bloqueo y opacidad (y referencias, ver fase 3)
+export const FORMAT_VERSION = 3;
+const SUPPORTED = [1, 2, 3];
 
 const round = (v) => +v.toFixed(6);
+const round4 = (v) => Math.round(v * 1e4) / 1e4 + 0; // + 0: sin -0
+const roundPoint = (p) => [round4(p[0]), round4(p[1]), round4(p[2])];
 
 function transformOf(obj) {
   return {
@@ -51,7 +56,9 @@ export function serializeProject(scene) {
     const ud = obj.userData;
     if (!ud) return;
     if (ud.strokePoints) {
-      const s = { layerId: ud.layerId, color: ud.strokeColor, width: ud.strokeWidth, points: ud.strokePoints };
+      // Coordenadas con 4 decimales (0.1 mm si la unidad es el metro): una
+      // diferencia invisible que reduce el archivo a menos de la mitad
+      const s = { layerId: ud.layerId, color: ud.strokeColor, width: ud.strokeWidth, points: ud.strokePoints.map(roundPoint) };
       if (ud.strokePressures) s.pressures = ud.strokePressures;
       if (ud.strokeFaceNormal) s.faceNormal = ud.strokeFaceNormal;
       if (ud.brush) s.brush = ud.brush;
@@ -69,7 +76,8 @@ export function serializeProject(scene) {
   });
 
   const { layers, activeLayerId, savedViews, drawPlane, mirror } = getState();
-  return { version: FORMAT_VERSION, layers, activeLayerId, savedViews, drawPlane, mirror, strokes, primitives };
+  const references = serializeReferences(scene);
+  return { version: FORMAT_VERSION, layers: layers.map(normalizeLayer), activeLayerId, savedViews, drawPlane, mirror, strokes, primitives, references };
 }
 
 /**
@@ -84,11 +92,11 @@ export function loadProject(scene, strokeEngine, data, { strokeOptions = null } 
     throw new Error(`Formato de proyecto no reconocido (versión ${data && data.version})`);
   }
 
-  const toRemove = scene.children.filter((o) => o.userData && (o.userData.strokePoints || o.userData.primitiveKind));
+  const toRemove = scene.children.filter((o) => o.userData && (o.userData.strokePoints || o.userData.primitiveKind || o.userData.reference));
   toRemove.forEach((o) => scene.remove(o));
 
   setState({
-    layers: data.layers,
+    layers: (data.layers && data.layers.length ? data.layers : [{ id: 'layer-1', name: 'Capa 1' }]).map(normalizeLayer),
     activeLayerId: data.activeLayerId,
     savedViews: data.savedViews || [],
     selectedId: null,
@@ -116,6 +124,8 @@ export function loadProject(scene, strokeEngine, data, { strokeOptions = null } 
     const mesh = placePrimitive(scene, p.kind, new THREE.Vector3(), { color: p.color, layerId: p.layerId, record: false });
     applyTransform(mesh, p);
   });
+
+  loadReferences(scene, data.references || []);
 
   // La visibilidad de capas se re-aplica sola (layers.js escucha `layers`),
   // pero los meshes recién creados llegaron DESPUÉS de ese aviso.
@@ -169,18 +179,20 @@ export function pickAndLoadProject(scene, strokeEngine, onDone, loadOpts) {
   input.click();
 }
 
+
 /**
- * Exporta una imagen PNG de lo que se ve. Antes salía en blanco en muchos
- * navegadores: WebGL descarta el buffer después de mostrarlo
- * (preserveDrawingBuffer: false), así que hay que dibujar y capturar en el
- * mismo instante. También oculta las ayudas visuales (grilla del plano,
- * espejo, piso) para que la imagen tenga solo el dibujo.
+ * Empieza un dibujo nuevo: saca trazos, figuras y referencias, vuelve a
+ * una sola capa y vacía el historial. La grilla, luces y guías quedan.
  */
-export function exportImage(renderer, { render, hide = [] } = {}, filename = 'dibujo.png') {
-  const prev = hide.map((o) => o.visible);
-  hide.forEach((o) => { o.visible = false; });
-  if (render) render();
-  renderer.domElement.toBlob((blob) => { if (blob) download(blob, filename); }, 'image/png');
-  hide.forEach((o, i) => { o.visible = prev[i]; });
-  if (render) render();
+export function newProject(scene) {
+  const toRemove = scene.children.filter((o) => o.userData &&
+    (o.userData.strokePoints || o.userData.primitiveKind || o.userData.reference));
+  toRemove.forEach((o) => scene.remove(o));
+  setState({
+    layers: [{ id: 'layer-1', name: 'Capa 1', visible: true, locked: false, opacity: 1 }],
+    activeLayerId: 'layer-1',
+    savedViews: [],
+    selectedIds: [],
+  });
+  clearHistory();
 }

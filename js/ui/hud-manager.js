@@ -37,7 +37,14 @@ const SLOTS = {
   'edge-left-center':    { v: 'center', h: 'left', stack: 'column' },
   'edge-right-center':   { v: 'center', h: 'right', stack: 'column' },
   // Debajo de la fila superior — para avisos que no deben empujar a nadie
-  'overlay-top-center':  { v: 'top', h: 'center', stack: 'column', extraTop: 64 },
+  'overlay-top-center':  { v: 'top', h: 'center', stack: 'column', below: ['corner-top-left', 'corner-top-right', 'edge-top-center'] },
+};
+
+// Cuando un slot cambia, estos otros dependen de su posición y se recalculan
+const DEPENDENTS = {
+  'corner-top-left': ['edge-top-center', 'overlay-top-center'],
+  'corner-top-right': ['edge-top-center', 'overlay-top-center'],
+  'edge-top-center': ['overlay-top-center'],
 };
 
 const registry = new Map(); // id -> { id, spec, slot, order, el, ro }
@@ -134,14 +141,44 @@ function entriesOf(slot) {
     .sort((a, b) => a.order - b.order);
 }
 
+/** Borde inferior (px) de lo que ocupa un slot ahora mismo (0 si está vacío). */
+function slotBottom(slot) {
+  return entriesOf(slot).reduce((b, { el }) => Math.max(b, (parseFloat(el.style.top) || 0) + el.offsetHeight), 0);
+}
+/** Borde derecho/izquierdo de las esquinas de arriba (para no pisarlas). */
+function cornerExtent(slot, side) {
+  const es = entriesOf(slot);
+  if (!es.length) return null;
+  return side === 'right'
+    ? Math.max(...es.map(({ el }) => (parseFloat(el.style.left) || 0) + el.offsetWidth))
+    : Math.min(...es.map(({ el }) => parseFloat(el.style.left) || 0));
+}
+
 function layoutSlot(slot) {
+  layoutOne(slot);
+  (DEPENDENTS[slot] || []).forEach(layoutOne);
+}
+
+function layoutOne(slot) {
   const cfg = SLOTS[slot];
   if (!cfg) return;
   const entries = entriesOf(slot);
   if (!entries.length) return;
 
   const W = window.innerWidth, H = window.innerHeight, m = margin();
-  const top = m + insets.top + (cfg.extraTop || 0);
+  let top = m + insets.top + (cfg.extraTop || 0);
+  // Slots que van DEBAJO de otros (avisos): debajo de todo lo que haya arriba
+  if (cfg.below) top = Math.max(top, ...cfg.below.map((s) => slotBottom(s) + GAP));
+  // Arriba al centro: si no entra entre las dos esquinas, baja debajo de ellas
+  if (slot === 'edge-top-center') {
+    const l = cornerExtent('corner-top-left', 'right');
+    const r = cornerExtent('corner-top-right', 'left');
+    const widest = Math.max(...entries.map(({ el }) => el.offsetWidth));
+    const x0 = (W - widest) / 2, x1 = x0 + widest;
+    if ((l != null && x0 < l + GAP) || (r != null && x1 > r - GAP)) {
+      top = Math.max(slotBottom('corner-top-left'), slotBottom('corner-top-right')) + GAP;
+    }
+  }
   const bottom = m + insets.bottom;
   const left = m + insets.left;
   const right = m + insets.right;

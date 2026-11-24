@@ -56,31 +56,44 @@ export function createSettingsPanel({ id = 'settings', slot = 'corner-top-left',
   smoothTitle.textContent = 'SUAVIZADO DEL TRAZO';
   const smooth = segmented(SMOOTHING, (o) => setState({ smoothing: o.value }));
 
-  const pressureRow = document.createElement('label');
-  pressureRow.className = 'switch-row';
-  pressureRow.innerHTML = '<span>Presión del lápiz</span><input type="checkbox" role="switch"><span class="switch"></span>';
-  const pressureInput = pressureRow.querySelector('input');
-  pressureInput.addEventListener('change', () => setState({ pressure: pressureInput.checked }));
+  // Interruptores: { clave del store, texto, ayuda }
+  const SWITCHES = [
+    { key: 'pressure', label: 'Presión del lápiz' },
+    { key: 'quickShapes', label: 'Formas rápidas', hint: 'Al terminar un trazo, mantené el lápiz quieto: se vuelve línea, círculo, rectángulo…' },
+    { key: 'snapping', label: 'Imán entre trazos', hint: 'Las puntas del trazo se pegan a otros trazos cercanos.' },
+    { key: 'autoOrtho', label: 'Vista ortográfica al alinear', hint: 'Al ver un plano de frente, sin perspectiva (como un plano técnico).' },
+  ];
+  const toolsTitle = document.createElement('div');
+  toolsTitle.className = 'panel-title';
+  toolsTitle.textContent = 'AYUDAS AL DIBUJAR';
+  const switches = SWITCHES.map((sw) => {
+    const row = document.createElement('label');
+    row.className = 'switch-row';
+    row.innerHTML = `<span>${sw.label}${sw.hint ? `<small>${sw.hint}</small>` : ''}</span><input type="checkbox" role="switch"><span class="switch"></span>`;
+    const input = row.querySelector('input');
+    input.addEventListener('change', () => setState({ [sw.key]: input.checked }));
+    return { ...sw, row, input };
+  });
 
   const helpBtn = document.createElement('button');
   helpBtn.className = 'panel-action';
   helpBtn.innerHTML = `${icon('help')}<span>Ver gestos y atajos</span>`;
   helpBtn.addEventListener('click', (e) => { e.stopPropagation(); pop.close(); if (onHelp) onHelp(); });
 
-  panel.append(input, inputHint, smoothTitle, smooth, pressureRow, helpBtn);
+  panel.append(input, inputHint, smoothTitle, smooth, toolsTitle, ...switches.map((w) => w.row), helpBtn);
   const pop = attachPopover({ trigger, panel });
 
   function render(st) {
     input.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.id === st.inputMode));
     const nearest = SMOOTHING.reduce((a, b) => (Math.abs(b.value - st.smoothing) < Math.abs(a.value - st.smoothing) ? b : a));
     smooth.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.id === nearest.id));
-    pressureInput.checked = !!st.pressure;
+    switches.forEach((w) => { w.input.checked = !!st[w.key]; });
     inputHint.textContent = isPenMode(st)
       ? 'El lápiz dibuja · 1 dedo orbita · 2 dedos mueven y hacen zoom.'
       : 'El dedo dibuja · 2 dedos orbitan y hacen zoom · 3 dedos mueven.' +
         (st.inputMode === 'auto' ? ' (Cambia solo al detectar un lápiz.)' : '');
   }
-  subscribe(render, (s) => [s.inputMode, s.penDetected, s.smoothing, s.pressure]);
+  subscribe(render, (s) => [s.inputMode, s.penDetected, s.smoothing, s.pressure, s.quickShapes, s.snapping, s.autoOrtho]);
   render(getState());
 
   register({ id, slot, order, el: trigger });

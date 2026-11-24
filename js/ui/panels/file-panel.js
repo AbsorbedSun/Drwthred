@@ -1,49 +1,47 @@
 // ============================================================================
-// FILE PANEL — categoría 2 del sistema de HUD. Igual que views-panel.js,
-// necesita referencias directas (scene, strokeEngine, renderer) que no
-// viven en el store — por eso se arma en scene-demo.js.
+// FILE PANEL — menú Archivo. No sabe qué hace cada acción: recibe la lista
+// desde app.js ({ id, icon, label, run, separatorBefore }). Así sumar una
+// acción (exportar 3D, imagen de referencia...) no toca este archivo.
 // ============================================================================
 import { register } from '../hud-manager.js';
 import { attachPopover } from '../popover.js';
-import { downloadProject, pickAndLoadProject, exportImage } from '../../persistence/save-load.js';
 import { icon } from '../icons.js';
 
-export function createFilePanel({ id, slot, order, scene, strokeEngine, renderer, onToast, exportOpts = {}, loadOpts }) {
+export function createFilePanel({ id, slot, order, actions, footer = null }) {
   const trigger = document.createElement('button');
   trigger.className = 'hud-fab';
   trigger.innerHTML = icon('folder');
-  trigger.title = 'Guardar / Cargar / Exportar';
+  trigger.title = 'Archivo';
   trigger.setAttribute('aria-label', 'Archivo');
 
   const panel = document.createElement('div');
   panel.className = 'hud-panel file-panel';
-  panel.innerHTML = `
-    <div class="panel-title">ARCHIVO</div>
-    <button class="panel-action" data-action="save">${icon('save')}<span>Guardar proyecto</span></button>
-    <button class="panel-action" data-action="load">${icon('load')}<span>Cargar proyecto</span></button>
-    <button class="panel-action" data-action="export">${icon('image')}<span>Exportar imagen</span></button>
-  `;
-
-  panel.addEventListener('click', (e) => {
-    const btn = e.target.closest('.panel-action');
-    if (!btn) return;
-    e.stopPropagation();
-    const action = btn.dataset.action;
-    if (action === 'save') {
-      downloadProject(scene);
-      if (onToast) onToast('Proyecto descargado');
-    } else if (action === 'load') {
-      pickAndLoadProject(scene, strokeEngine, (err) => {
-        if (onToast) onToast(err ? 'No se pudo cargar el archivo' : 'Proyecto cargado');
-      }, loadOpts);
-    } else if (action === 'export') {
-      exportImage(renderer, exportOpts);
-      if (onToast) onToast('Imagen exportada');
+  panel.innerHTML = '<div class="panel-title">ARCHIVO</div>';
+  actions.forEach((a) => {
+    if (a.separatorBefore) {
+      const sep = document.createElement('div');
+      sep.className = 'panel-sep';
+      panel.appendChild(sep);
     }
-    pop.close();
+    const b = document.createElement('button');
+    b.className = 'panel-action' + (a.danger ? ' danger' : '');
+    b.dataset.action = a.id;
+    b.innerHTML = `${icon(a.icon)}<span>${a.label}</span>`;
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      pop.close();
+      a.run();
+    });
+    panel.appendChild(b);
   });
+  let footerEl = null;
+  if (footer) {
+    footerEl = document.createElement('div');
+    footerEl.className = 'panel-footer';
+    panel.appendChild(footerEl);
+  }
 
-  const pop = attachPopover({ trigger, panel });
+  const pop = attachPopover({ trigger, panel, onOpen: () => { if (footerEl) footerEl.textContent = footer(); } });
 
   register({ id, slot, order, el: trigger });
   return { el: trigger };

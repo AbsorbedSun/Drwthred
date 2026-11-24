@@ -19,11 +19,12 @@ import * as THREE from '../vendor/three.module.js';
 import { pushAction } from '../core/history.js';
 import { buildRibbonGeometry, centroidOf } from './stroke-engine.js';
 import { getBrush } from './brushes.js';
+import { isLockedObject } from './layers.js';
 
 const raycaster = new THREE.Raycaster();
 
 function strokeMeshes(scene) {
-  const list = scene.children.filter((o) => o.visible && o.userData && o.userData.strokePoints);
+  const list = scene.children.filter((o) => o.visible && o.userData && o.userData.strokePoints && !isLockedObject(o));
   // Con render bajo demanda, la matriz de mundo de un objeto recién
   // movido puede no estar actualizada todavía: el raycast la necesita.
   list.forEach((o) => o.updateMatrixWorld());
