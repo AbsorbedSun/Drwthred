@@ -30,7 +30,11 @@ export function createTransformController({ scene, camera }) {
   /** ¿Tiene sentido que 1 dedo mueva o 2 dedos transformen ahora mismo? */
   function isActive() {
     const { activeTool, selectedId } = getState();
-    return !!selectedId && (activeTool === 'select' || activeTool === 'shapes');
+    if (!selectedId || (activeTool !== 'select' && activeTool !== 'shapes')) return false;
+    // Si lo seleccionado ya no está en la escena (se deshizo o borró), no
+    // hay nada que transformar: los 2 dedos tienen que volver a navegar.
+    const obj = currentSelection();
+    return !!obj && obj.visible;
   }
 
   // ── Mover (1 dedo) ──

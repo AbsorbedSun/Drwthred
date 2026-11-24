@@ -59,7 +59,7 @@ export function createSizeSlider({ id = 'size-slider', order = 1 } = {}) {
     value.textContent = Math.round(brushWidth * 1000);
     wrap.classList.toggle('dim', activeTool !== 'brush');
   }
-  subscribe(render);
+  subscribe(render, (s) => [s.brushWidth, s.brushColor, s.activeTool]);
   render(getState());
 
   register({ id, slot: 'edge-right-center', order, el: wrap });

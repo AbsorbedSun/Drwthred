@@ -51,14 +51,14 @@ export function createToolbar({ id = 'toolbar', tools, order = 0, onSelect }) {
 
   function buildVariantsPanel(tool) {
     const panel = document.createElement('div');
-    panel.className = 'hud-panel variants-panel';
+    panel.className = 'hud-panel variants-panel' + (tool.layout === 'grid' ? ' variants-grid' : '');
     const title = document.createElement('div');
     title.className = 'panel-title';
     title.textContent = tool.label.toUpperCase();
     panel.appendChild(title);
     tool.variants.forEach((v) => {
       const b = document.createElement('button');
-      b.className = 'variant-row';
+      b.className = tool.layout === 'grid' ? 'variant-tile' : 'variant-row';
       b.dataset.variant = v.id;
       b.innerHTML = `${v.icon}<span>${v.label}</span>`;
       b.addEventListener('click', (e) => {
@@ -141,13 +141,17 @@ export function createToolbar({ id = 'toolbar', tools, order = 0, onSelect }) {
   function render(st) {
     tools.forEach((tool) => {
       const b = buttons.get(tool.id);
-      const v = variantOf(tool, st.toolVariants[tool.id]);
-      const html = v.icon || tool.icon;
+      // La herramienta activa muestra la variante REALMENTE activa
+      const vid = st.activeTool === tool.id ? st.activeVariant : st.toolVariants[tool.id];
+      const v = variantOf(tool, vid);
+      // Pincel y Figuras muestran la variante activa (qué pincel/qué figura);
+      // el resto, el ícono de la herramienta, que se reconoce mejor de un vistazo.
+      const html = (tool.showVariant && v.icon) || tool.icon;
       if (b._icon !== html) { b.innerHTML = html; b._icon = html; }
       b.classList.toggle('active', st.activeTool === tool.id);
       b.title = tool.variants.length > 1 ? `${tool.label} — ${v.label}` : tool.label;
       const pop = popovers.get(tool.id);
-      if (pop) pop.panel.querySelectorAll('.variant-row').forEach((r) =>
+      if (pop) pop.panel.querySelectorAll('.variant-row, .variant-tile').forEach((r) =>
         r.classList.toggle('active', r.dataset.variant === v.id));
     });
     swatchBtn.querySelector('.swatch-dot').style.background = st.brushColor;
@@ -157,7 +161,7 @@ export function createToolbar({ id = 'toolbar', tools, order = 0, onSelect }) {
       try { picker.value = st.brushColor; } catch (err) { /* color no válido para el input */ }
     }
   }
-  subscribe(render);
+  subscribe(render, (s) => [s.activeTool, s.activeVariant, s.toolVariants, s.brushColor]);
   render(getState());
 
   register({ id, slot: { wide: 'edge-left-center', narrow: 'edge-bottom-center' }, order, el: bar });

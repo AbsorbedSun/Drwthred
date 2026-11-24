@@ -15,16 +15,22 @@ const BUILDERS = {
   cone: () => new THREE.ConeGeometry(0.18, 0.4, 20),
 };
 
-export function placePrimitive(scene, kind, point, { color = '#e0a458', layerId } = {}) {
+/**
+ * @param {Object} [opts]
+ * @param {boolean} [opts.record=true] - false al reconstruir desde un archivo (no entra al historial)
+ */
+export function placePrimitive(scene, kind, point, { color = '#e0a458', layerId, record = true } = {}) {
   const build = BUILDERS[kind] || BUILDERS.cube;
   const geo = build();
   const mat = new THREE.MeshStandardMaterial({ color, side: THREE.DoubleSide });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.copy(point);
-  mesh.userData = { layerId, primitiveKind: kind };
+  // El color "real" queda en userData: el resaltado de selección pisa
+  // material.color, así que guardar desde el material podía guardar el turquesa.
+  mesh.userData = { layerId, primitiveKind: kind, color: '#' + mat.color.getHexString() };
   scene.add(mesh);
 
-  pushAction({
+  if (record) pushAction({
     undo: () => scene.remove(mesh),
     redo: () => scene.add(mesh),
   });

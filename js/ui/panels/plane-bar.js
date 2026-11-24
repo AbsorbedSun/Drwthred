@@ -131,7 +131,7 @@ export function createPlaneBar({ id = 'plane-bar', order = 1, camCtl, camera, on
     alignBtn.disabled = !fixed;
     mirrorBtn.classList.toggle('active', !!mirror);
   }
-  subscribe(render);
+  subscribe(render, (s) => [s.drawPlane, s.mirror]);
   render(getState());
 
   register({ id, slot: 'edge-bottom-center', order, el: bar });

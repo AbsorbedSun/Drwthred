@@ -8,10 +8,10 @@ import { attachPopover } from '../popover.js';
 import { downloadProject, pickAndLoadProject, exportImage } from '../../persistence/save-load.js';
 import { icon } from '../icons.js';
 
-export function createFilePanel({ id, slot, order, scene, strokeEngine, renderer, onToast }) {
+export function createFilePanel({ id, slot, order, scene, strokeEngine, renderer, onToast, exportOpts = {}, loadOpts }) {
   const trigger = document.createElement('button');
   trigger.className = 'hud-fab';
-  trigger.innerHTML = icon('save');
+  trigger.innerHTML = icon('folder');
   trigger.title = 'Guardar / Cargar / Exportar';
   trigger.setAttribute('aria-label', 'Archivo');
 
@@ -35,9 +35,9 @@ export function createFilePanel({ id, slot, order, scene, strokeEngine, renderer
     } else if (action === 'load') {
       pickAndLoadProject(scene, strokeEngine, (err) => {
         if (onToast) onToast(err ? 'No se pudo cargar el archivo' : 'Proyecto cargado');
-      });
+      }, loadOpts);
     } else if (action === 'export') {
-      exportImage(renderer);
+      exportImage(renderer, exportOpts);
       if (onToast) onToast('Imagen exportada');
     }
     pop.close();

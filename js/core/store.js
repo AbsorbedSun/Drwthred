@@ -1,17 +1,21 @@
 // ============================================================================
-// STORE — única fuente de verdad. Reemplaza el patrón `window._algo` del
-// proyecto anterior: en vez de que cada módulo cuelgue funciones del
-// objeto global para que otros las llamen sin que quede registrado en
-// ningún lado quién depende de quién, todo pasa por getState/setState/
-// subscribe. Quien necesita reaccionar a un cambio se suscribe
+// STORE — única fuente de verdad. Todo pasa por getState/setState/
+// subscribe: quien necesita reaccionar a un cambio se suscribe
 // explícitamente — la dependencia queda escrita en el código.
+//
+// Optimización: subscribe(fn, selector) solo llama a `fn` cuando cambia
+// la PORCIÓN del estado que devuelve el selector (comparación superficial,
+// elemento por elemento si devuelve un array). Antes, mover el slider de
+// grosor reconstruía el DOM del panel de capas, el de vistas, recorría la
+// escena para la visibilidad de capas... decenas de veces por segundo.
+// setState además ignora parches que no cambian nada.
 // ============================================================================
 
 let state = {
   activeTool: 'brush',
   activeVariant: 'pencil',
   brushColor: '#ffffff',
-  brushWidth: 0.03,
+  brushWidth: 0.012,
   layers: [{ id: 'layer-1', name: 'Capa 1', visible: true }],
   activeLayerId: 'layer-1',
   savedViews: [],
@@ -22,7 +26,7 @@ let state = {
   toolVariants: { brush: 'pencil', eraser: 'erase-full', shapes: 'cube', select: 'select-single', plane: 'plane-move' },
 
   // Plano de dibujo activo (estilo Feather). mode:
-  //   'view'   → plano libre, siempre de frente a la cámara (comportamiento original)
+  //   'view'   → plano libre, siempre de frente a la cámara
   //   'front' | 'side' | 'ground' → planos fijos alineados a los ejes del mundo
   //   'custom' → plano fijo con cualquier normal (capturado desde la vista)
   // Ecuación del plano fijo: normal · p = offset
@@ -44,12 +48,39 @@ export function getState() {
 }
 
 export function setState(patch) {
+  let changed = false;
+  for (const k in patch) {
+    if (state[k] !== patch[k]) { changed = true; break; }
+  }
+  if (!changed) return;
   state = { ...state, ...patch };
-  listeners.forEach((fn) => fn(state));
+  listeners.forEach((l) => l(state));
 }
 
-/** @returns {Function} función para des-suscribirse */
-export function subscribe(fn) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
+function sameSlice(a, b) {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+/**
+ * @param {Function} fn        - recibe el estado completo
+ * @param {Function} [selector] - (state) => valor o array de valores; si se
+ *   pasa, `fn` solo corre cuando ese valor cambia.
+ * @returns {Function} función para des-suscribirse
+ */
+export function subscribe(fn, selector) {
+  let listener = fn;
+  if (selector) {
+    let last = selector(state);
+    listener = (s) => {
+      const next = selector(s);
+      if (sameSlice(last, next)) return;
+      last = next;
+      fn(s);
+    };
+  }
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }

@@ -64,7 +64,7 @@ export function createLayersPanel({ id, slot, order }) {
     panel.appendChild(addBtn);
   }
 
-  subscribe(render);
+  subscribe(render, (s) => [s.layers, s.activeLayerId]);
   render();
 
   // Sin auto-cierre por tiempo: capas es un panel de trabajo — se puede

@@ -1,69 +1,88 @@
 // ============================================================================
-// ICONS — un solo lugar para todos los íconos del HUD. Antes cada botón
-// usaba un glifo Unicode suelto (✎, ⌫, ◆...) — se veían inconsistentes
-// entre sí (peso visual distinto, algunos ni renderizaban bien según la
-// fuente del sistema). Acá todos comparten el mismo viewBox, grosor de
-// trazo y estilo de línea — un set real, no un collage de emojis.
+// ICONS — un solo lugar para todos los íconos de la interfaz.
+//
+// Estilo del set (v2): líneas de 1.9 con puntas y uniones REDONDEADAS,
+// esquinas suaves, y un relleno "duotono" (el mismo color al 18%) en la
+// forma principal de cada ícono — se leen mejor a 20-22px en una tablet
+// que los contornos finos, sin perder la simpleza. Todos comparten viewBox
+// 24×24 y heredan el color del botón (currentColor), así que el estado
+// activo/inactivo los colorea solo.
 // ============================================================================
 const WRAP = (inner) =>
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+
+/** Relleno duotono: misma forma, sin trazo, al 18% del color. */
+const D = (d) => `<path d="${d}" fill="currentColor" fill-opacity=".18" stroke="none"/>`;
+/** Forma con relleno duotono + contorno. */
+const S = (d) => `${D(d)}<path d="${d}"/>`;
+
+const TRAY = 'M4.5 15.5v2A2.5 2.5 0 0 0 7 20h10a2.5 2.5 0 0 0 2.5-2.5v-2';
 
 const PATHS = {
-  // Herramientas principales
-  pencil: `<path d="M14.5 4.5l5 5L8 21H3v-5z"/><path d="M12.5 6.5l5 5"/>`,
-  eraser: `<path d="M18 13l-7.5 7.5a2 2 0 0 1-2.8 0L3 15.8a2 2 0 0 1 0-2.8L13 3a2 2 0 0 1 2.8 0L20 7.2a2 2 0 0 1 0 2.8L15 15"/><path d="M8 21h11"/>`,
-  shapes: `<circle cx="8" cy="8" r="4.5"/><rect x="13" y="13" width="8" height="8" rx="1"/>`,
-  cursor: `<path d="M5 3l6 17 2.4-7.1L20.5 10.5z"/>`,
+  // ── Herramientas principales ──
+  brush: `${S('M9.7 13.4c-2.1-.1-3.8 1.4-3.8 3.4 0 1-.6 2-1.9 2.6 3.9 1.5 7.8-.3 7.7-4.2z')}<path d="M19.6 4.4c-2.6 1-7.2 5.7-8.6 7.6l1.9 1.9c1.9-1.4 6.6-6 7.6-8.6a.7.7 0 0 0-.9-.9z"/>`,
+  eraser: `${S('M13.3 4.2a2 2 0 0 1 2.8 0l3.7 3.7a2 2 0 0 1 0 2.8l-7.3 7.3a3 3 0 0 1-2.1.9H7.6a2 2 0 0 1-1.4-.6l-2-2a2 2 0 0 1 0-2.8z')}<path d="M8.8 8.7l6.5 6.5"/><path d="M14 19.9h6"/>`,
+  cursor: S('M5.6 4.3l13.2 5.3a.6.6 0 0 1 0 1.1l-5.5 2.1-2.1 5.5a.6.6 0 0 1-1.1 0L4.8 5.1a.6.6 0 0 1 .8-.8z'),
+  shapes: `<circle cx="8.5" cy="8.5" r="4.6"/>${S('M14.2 12.2h4.6a2 2 0 0 1 2 2v4.6a2 2 0 0 1-2 2h-4.6a2 2 0 0 1-2-2v-4.6a2 2 0 0 1 2-2z')}`,
+  planeTool: `${S('M7.4 14.5h12.1a.6.6 0 0 1 .5 1l-2.8 3.6a1.5 1.5 0 0 1-1.2.6H4.5a.6.6 0 0 1-.5-1l2.2-3.6a1.5 1.5 0 0 1 1.2-.6z')}<path d="M12 11.5V3.8M8.8 7l3.2-3.2L15.2 7"/>`,
 
-  // Variantes de pincel
-  pencilThin: `<path d="M14.5 4.5l5 5L8 21H3v-5z"/>`,
-  marker: `<rect x="8" y="3" width="8" height="6" rx="1"/><path d="M9 9l3 4 3-4"/><path d="M12 13v8"/>`,
-  airbrush: `<rect x="6" y="9" width="6" height="11" rx="1"/><path d="M9 9V6a2 2 0 0 1 2-2h2"/><circle cx="17" cy="7" r=".7" fill="currentColor" stroke="none"/><circle cx="19.5" cy="10" r=".7" fill="currentColor" stroke="none"/><circle cx="16.5" cy="11.5" r=".7" fill="currentColor" stroke="none"/>`,
+  // ── Pinceles ──
+  pencil: `${S('M16.1 4.6a2 2 0 0 1 2.8 0l.5.5a2 2 0 0 1 0 2.8L8.8 18.5l-4.1.8.8-4.1z')}<path d="M14.1 6.6l3.3 3.3"/>`,
+  ink: `${S('M12 3.6l5 6.3a1.5 1.5 0 0 1 .2 1.5L12 20.4l-5.2-9a1.5 1.5 0 0 1 .2-1.5z')}<path d="M12 12.5v7.9"/><circle cx="12" cy="10.6" r="1.2" fill="currentColor"/>`,
+  marker: `${S('M14.6 4.3a1.5 1.5 0 0 1 2.1 0l3 3a1.5 1.5 0 0 1 0 2.1l-7.3 7.3-5.1-5.1z')}<path d="M7.3 11.6l-2.1 2.1a1 1 0 0 0-.3.7v2.7l2.1 2.1h2.7a1 1 0 0 0 .7-.3l2.1-2.1"/>`,
+  softBrush: `${S('M9.7 13.4c-2.1-.1-3.8 1.4-3.8 3.4 0 1-.6 2-1.9 2.6 3.9 1.5 7.8-.3 7.7-4.2z')}<path d="M19.6 4.4c-2.6 1-7.2 5.7-8.6 7.6l1.9 1.9c1.9-1.4 6.6-6 7.6-8.6a.7.7 0 0 0-.9-.9z"/>`,
+  calligraphy: `<path d="M4.6 17.8c2.4.6 4.1-1.3 5.6-4.7S13.6 6 16.3 6.2c1.3.1 2.4.8 3 1.8-1.2-.4-2.4-.2-3.4.5-1.8 1.3-2.4 4.7-4.2 7.4-1.7 2.6-4.6 3.4-7.1 1.9z" fill="currentColor" fill-opacity=".9" stroke-width="1.2"/>`,
+  neon: `<path d="M3.8 14.5l4-5.2 4.2 6 4.2-6 4 5.2" stroke-width="5.5" stroke-opacity=".2"/><path d="M3.8 14.5l4-5.2 4.2 6 4.2-6 4 5.2"/>`,
+  watercolor: `${S('M12 3.8c3.1 3.7 5.6 6.7 5.6 9.8a5.6 5.6 0 0 1-11.2 0c0-3.1 2.5-6.1 5.6-9.8z')}<path d="M9.4 14.2a2.7 2.7 0 0 0 2.2 2.5" stroke-opacity=".7"/>`,
+  dashed: `<path d="M4 17.5c4-1.2 5-9.5 8-10.4s4 6.2 8 5.1" stroke-dasharray="3.2 3.4"/>`,
+  chalk: `${S('M13.7 3.9a2 2 0 0 1 2.8.4l1.6 2.2a2 2 0 0 1-.4 2.8l-6.5 4.8-4-5.4z')}<path d="M7.2 8.7l4 5.4"/><path d="M4.5 19.6h.01M7.6 18.6h.01M10.6 19.9h.01M13.7 18.8h.01M16.8 19.7h.01M19.6 18.7h.01" stroke-width="2.4"/>`,
+  // Alias viejos (proyectos/configs que todavía los nombren)
+  pencilThin: '', airbrush: '',
 
-  // Variantes de goma
-  eraseFull: `<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9l6 6M15 9l-6 6"/>`,
-  erasePartial: `<path d="M18 13l-7.5 7.5a2 2 0 0 1-2.8 0L3 15.8a2 2 0 0 1 0-2.8L13 3a2 2 0 0 1 2.8 0L20 7.2a2 2 0 0 1 0 2.8L15 15"/><path stroke-dasharray="2 3" d="M8 21h11"/>`,
+  // ── Goma ──
+  eraseFull: `<path d="M3.5 13.5c2.3-3.6 4.2-3.6 5.6 0s3.3 3.6 5.6 0 3.3-3.6 5.8-.4" stroke-opacity=".35"/>${D('M12 5.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13z')}<path d="M9 9l6 6M15 9l-6 6"/>`,
+  erasePartial: `<path d="M3.6 14.5c1.5-2.4 3-2.9 4.4-1.7"/><path d="M16 12.8c1.4 1.2 2.9.7 4.4-1.7"/>${D('M12 10a3 3 0 1 1 0 6 3 3 0 0 1 0-6z')}<circle cx="12" cy="13" r="3" stroke-dasharray="1.6 2.2"/>`,
 
-  // Variantes de figuras
-  plane: `<rect x="4" y="7" width="16" height="10" rx="1"/>`,
-  cube: `<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5L12 12l8-4.5M12 12v9"/>`,
-  sphere: `<circle cx="12" cy="12" r="8.5"/><ellipse cx="12" cy="12" rx="8.5" ry="3.2"/>`,
-  cylinder: `<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12a7 3 0 0 0 14 0V6"/>`,
-  cone: `<ellipse cx="12" cy="19" rx="7" ry="2.5"/><path d="M12 3l6.2 16"/><path d="M12 3L5.8 19"/>`,
+  // ── Figuras ──
+  cube: `${D('M12 3.6l7.4 4.2L12 12 4.6 7.8z')}<path d="M12 3.6l7.4 4.2v8.4L12 20.4l-7.4-4.2V7.8z"/><path d="M4.6 7.8L12 12l7.4-4.2M12 12v8.4"/>`,
+  sphere: `${S('M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8z')}<path d="M3.7 12c1.3 1.7 4.6 2.9 8.3 2.9s7-1.2 8.3-2.9"/>`,
+  cylinder: `${D('M5 6.2c0-1.5 3.1-2.7 7-2.7s7 1.2 7 2.7v11.6c0 1.5-3.1 2.7-7 2.7s-7-1.2-7-2.7z')}<ellipse cx="12" cy="6.2" rx="7" ry="2.7"/><path d="M5 6.2v11.6c0 1.5 3.1 2.7 7 2.7s7-1.2 7-2.7V6.2"/>`,
+  cone: `${D('M12 3.6l7 14.2c0 1.5-3.1 2.6-7 2.6s-7-1.1-7-2.6z')}<path d="M5 17.8L12 3.6l7 14.2"/><path d="M5 17.8c0 1.5 3.1 2.6 7 2.6s7-1.1 7-2.6-3.1-2.6-7-2.6-7 1.1-7 2.6z"/>`,
+  plane: S('M7.6 6.5h11.5a.8.8 0 0 1 .8 1l-2.3 9.4a1.5 1.5 0 0 1-1.5 1.1H4.6a.8.8 0 0 1-.8-1l2.3-9.4a1.5 1.5 0 0 1 1.5-1.1z'),
 
-  // Variantes de selección
-  selectSingle: `<circle cx="12" cy="12" r="7"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/>`,
-  selectLasso: `<path d="M12 4c-5 0-8.5 3-8.5 6.5 0 2.6 2 4.7 4.8 5.5-.5.8-.3 1.7.5 2 1 .4 1.7-.3 1.7-1.2 2.7.3 5.5-1.6 5.5-6.3C20.5 7 16.8 4 12 4z"/>`,
+  // ── Acciones / navegación ──
+  undo: `<path d="M9 14.5L4.5 10 9 5.5"/><path d="M4.5 10H15a4.5 4.5 0 0 1 0 9h-3"/>`,
+  redo: `<path d="M15 14.5l4.5-4.5L15 5.5"/><path d="M19.5 10H9a4.5 4.5 0 0 0 0 9h3"/>`,
+  views: `${S('M6.5 7h11A3.5 3.5 0 0 1 21 10.5v6a3.5 3.5 0 0 1-3.5 3.5h-11A3.5 3.5 0 0 1 3 16.5v-6A3.5 3.5 0 0 1 6.5 7z')}<path d="M8.5 7l1.1-1.9A2 2 0 0 1 11.3 4h1.4a2 2 0 0 1 1.7 1.1L15.5 7"/><circle cx="12" cy="13.5" r="3.2"/>`,
+  folder: S('M3.5 8A2.5 2.5 0 0 1 6 5.5h3.1a2 2 0 0 1 1.4.6l1.4 1.4H18A2.5 2.5 0 0 1 20.5 10v7.5A2.5 2.5 0 0 1 18 20H6a2.5 2.5 0 0 1-2.5-2.5z'),
+  save: `<path d="M12 4v10.5M7.8 10.3L12 14.5l4.2-4.2"/><path d="${TRAY}"/>`,
+  load: `<path d="M12 15V4.5M7.8 8.7L12 4.5l4.2 4.2"/><path d="${TRAY}"/>`,
+  image: `${S('M7 4.5h10A3.5 3.5 0 0 1 20.5 8v8a3.5 3.5 0 0 1-3.5 3.5H7A3.5 3.5 0 0 1 3.5 16V8A3.5 3.5 0 0 1 7 4.5z')}<circle cx="9" cy="10" r="1.7"/><path d="M20.3 15.3l-4-4a1.5 1.5 0 0 0-2.1 0L6.4 19.2"/>`,
+  layers: `${S('M12 3.8l8.2 4.3-8.2 4.3-8.2-4.3z')}<path d="M3.8 12.2l8.2 4.3 8.2-4.3"/><path d="M3.8 16.2l8.2 4.3 8.2-4.3"/>`,
+  home: `${D('M6 9.3V18.5A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V9.3L12 4.6z')}<path d="M4 10.6l8-6.4 8 6.4"/><path d="M6 9.3v9.2A1.5 1.5 0 0 0 7.5 20h9a1.5 1.5 0 0 0 1.5-1.5V9.3"/><path d="M10 20v-4.5a2 2 0 0 1 4 0V20"/>`,
 
-  // Acciones / navegación
-  undo: `<path d="M7 7H16a5 5 0 0 1 0 10h-5"/><path d="M10.5 3.5L7 7l3.5 3.5"/>`,
-  redo: `<path d="M17 7H8a5 5 0 0 0 0 10h5"/><path d="M13.5 3.5L17 7l-3.5 3.5"/>`,
-  views: `<path d="M4 8V5a1 1 0 0 1 1-1h3M20 8V5a1 1 0 0 0-1-1h-3M4 16v3a1 1 0 0 0 1 1h3M20 16v3a1 1 0 0 1-1 1h-3"/><circle cx="12" cy="12" r="3.3"/>`,
-  save: `<path d="M5 3h11l5 5v13H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/>`,
-  load: `<path d="M5 3h11l5 5v13H5z"/><path d="M12 17v-7M9 13l3-3 3 3"/>`,
-  image: `<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5-4 4-3-3-6 6"/>`,
-  layers: `<path d="M12 3l8 4.5-8 4.5-8-4.5z"/><path d="M4 12l8 4.5 8-4.5M4 16.5L12 21l8-4.5"/>`,
-
-  // Utilitarios
-  eyeOpen: `<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>`,
-  eyeClosed: `<path d="M3 3l18 18"/><path d="M10.6 5.2A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.4 17.4 0 0 1-3.4 4.2M6.6 6.6C4 8.3 2 12 2 12s3.5 7 10 7c1.4 0 2.7-.3 3.9-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>`,
+  // ── Utilitarios ──
+  eyeOpen: `${D('M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z')}<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>`,
+  eyeClosed: `<path d="M3.5 9.5C5.3 12 8.3 14 12 14s6.7-2 8.5-4.5"/><path d="M6.2 12.3L4.5 15M12 14v3.2M17.8 12.3l1.7 2.7"/>`,
   plus: `<path d="M12 5v14M5 12h14"/>`,
-  close: `<path d="M6 6l12 12M18 6L6 18"/>`,
-  help: `<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.4c-.6.3-1 .8-1 1.5v.6"/><circle cx="12" cy="16.8" r=".7" fill="currentColor" stroke="none"/>`,
-  home: `<path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/>`,
+  close: `<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>`,
+  gear: `<path d="M4 7h8.5M18.5 7H20M4 17h1.5M11.5 17H20"/>${S('M15.5 4.6a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8z')}${S('M8.5 14.6a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8z')}`,
+  help: `${S('M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18z')}<path d="M9.6 9.4a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1.1.8-1.1 1.5v.4"/><circle cx="12" cy="16.6" r=".4" fill="currentColor" stroke-width="1.4"/>`,
 
-  // Planos de dibujo (estilo Feather)
-  planeTool: `<path d="M3 17.5l4.5-4.5H21l-4.5 4.5z"/><path d="M12 3v7M9.2 5.8L12 3l2.8 2.8"/>`,
-  planeFree: `<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 2.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>`,
-  planeFront: `<rect x="5" y="5" width="14" height="14" rx="1.2"/><path d="M5 12h14M12 5v14" stroke-opacity=".45"/>`,
-  planeSide: `<path d="M8 3.5l8 3.5v13.5l-8-3.5z"/><path d="M8 10.3l8 3.5" stroke-opacity=".45"/>`,
-  planeGround: `<path d="M2.5 16l5.5-6h13.5l-5.5 6z"/><path d="M9.3 16l5.5-6" stroke-opacity=".45"/>`,
-  planeCustom: `<path d="M4 15.5L10 4l10 4.5-6 11.5z"/><path d="M7 9.8l10 4.5" stroke-opacity=".45"/>`,
-  mirror: `<path d="M12 2.5v19" stroke-dasharray="2 2.4"/><path d="M9 7L4 17h5zM15 7l5 10h-5z"/>`,
-  alignView: `<circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>`,
-  planeHere: `<path d="M3 17.5l4.5-4.5H21l-4.5 4.5z"/><circle cx="12" cy="7" r="3"/><path d="M12 10v5"/>`,
-  gear: `<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1z"/>`,
+  // ── Planos de dibujo ──
+  planeFree: `<rect x="4" y="4" width="16" height="16" rx="4" stroke-dasharray="2.6 3"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/>`,
+  planeFront: `${S('M7.5 4.5h9a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-9a3 3 0 0 1-3-3v-9a3 3 0 0 1 3-3z')}<path d="M4.5 12h15M12 4.5v15" stroke-opacity=".4"/>`,
+  planeSide: `${S('M8.9 4.1l6.3 2.8a1.5 1.5 0 0 1 .9 1.4v11.1a.8.8 0 0 1-1.1.7L8.7 17.3a1.5 1.5 0 0 1-.9-1.4V4.8a.8.8 0 0 1 1.1-.7z')}<path d="M7.8 10.6l8.3 3.7" stroke-opacity=".4"/>`,
+  planeGround: `${S('M8.1 9.5h12a.6.6 0 0 1 .5 1l-4.3 5a1.5 1.5 0 0 1-1.1.5h-12a.6.6 0 0 1-.5-1l4.3-5a1.5 1.5 0 0 1 1.1-.5z')}<path d="M9.4 16l5.6-6.5" stroke-opacity=".4"/>`,
+  planeCustom: `${S('M10.1 4.3l8.5 3.6a.8.8 0 0 1 .4 1.1l-4.5 9.6a1.5 1.5 0 0 1-1.9.7L4.1 15.7a.8.8 0 0 1-.4-1.1l4.5-9.6a1.5 1.5 0 0 1 1.9-.7z')}<path d="M6 10l11 4.7" stroke-opacity=".4"/>`,
+  mirror: `<path d="M12 3.5v17" stroke-dasharray="1.2 3"/>${D('M15 7.5l4.8 8.6a.6.6 0 0 1-.5.9H15z')}<path d="M9 7.5l-4.8 8.6a.6.6 0 0 0 .5.9H9z"/><path d="M15 7.5l4.8 8.6a.6.6 0 0 1-.5.9H15z"/>`,
+  alignView: `${D('M12 5.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13z')}<circle cx="12" cy="12" r="6.5"/><path d="M12 2.8v2.7M12 18.5v2.7M2.8 12h2.7M18.5 12h2.7"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>`,
 };
+
+// Alias: nombres viejos → íconos nuevos
+PATHS.pencilThin = PATHS.pencil;
+PATHS.airbrush = PATHS.watercolor;
+PATHS.selectSingle = PATHS.cursor;
 
 /** Devuelve el markup SVG de un ícono por nombre. */
 export function icon(name) {

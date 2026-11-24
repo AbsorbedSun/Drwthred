@@ -9,6 +9,10 @@
 // de "deshacer" se suscribe para saber cuándo habilitarse/deshabilitarse,
 // igual que cualquier otro consumidor reactivo del store.
 // ============================================================================
+// Tope de pasos: cada acción retiene meshes (geometría en memoria) — sin
+// límite, una sesión larga en tablet crecía sin freno.
+export const MAX_HISTORY = 300;
+
 const undoStack = [];
 const redoStack = [];
 const listeners = new Set();
@@ -21,6 +25,7 @@ function notify() {
 /** Registra una acción ya ejecutada — llamar DESPUÉS de hacerla, no antes. */
 export function pushAction({ undo, redo }) {
   undoStack.push({ undo, redo });
+  if (undoStack.length > MAX_HISTORY) undoStack.shift();
   redoStack.length = 0; // una acción nueva invalida cualquier "rehacer" pendiente
   notify();
 }
@@ -51,9 +56,10 @@ export function subscribeHistory(fn) {
   return () => listeners.delete(fn);
 }
 
-/** Solo para tests — vacía la pila entre casos. */
-export function _clearHistory() {
+/** Vacía la pila — al cargar un proyecto, deshacer no debe mezclarse con lo anterior. */
+export function clearHistory() {
   undoStack.length = 0;
   redoStack.length = 0;
   notify();
 }
+export const _clearHistory = clearHistory; // nombre viejo, lo usan los tests

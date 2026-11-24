@@ -11,6 +11,8 @@ const MIN_PHI = 0.06;
 const MAX_PHI = Math.PI - 0.06;
 const MIN_RADIUS = 0.4;
 const MAX_RADIUS = 40;
+const _right = new THREE.Vector3();
+const _up = new THREE.Vector3();
 
 export function createCameraController(camera) {
   const state = {
@@ -39,8 +41,8 @@ export function createCameraController(camera) {
   function pan(dx, dy, sens = 0.0022) {
     // Right/up reales de la cámara en este instante, para que el pan
     // siempre vaya "para donde se ve", sin importar el ángulo actual.
-    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
-    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+    const right = _right.setFromMatrixColumn(camera.matrix, 0);
+    const up = _up.setFromMatrixColumn(camera.matrix, 1);
     const scale = state.radius * sens;
     state.target.addScaledVector(right, -dx * scale);
     state.target.addScaledVector(up, dy * scale);

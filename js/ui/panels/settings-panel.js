@@ -80,7 +80,7 @@ export function createSettingsPanel({ id = 'settings', slot = 'corner-top-left',
       : 'El dedo dibuja · 2 dedos orbitan y hacen zoom · 3 dedos mueven.' +
         (st.inputMode === 'auto' ? ' (Cambia solo al detectar un lápiz.)' : '');
   }
-  subscribe(render);
+  subscribe(render, (s) => [s.inputMode, s.penDetected, s.smoothing, s.pressure]);
   render(getState());
 
   register({ id, slot, order, el: trigger });

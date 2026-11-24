@@ -76,7 +76,7 @@ export function createViewsPanel({ id, slot, order, camCtl }) {
     panel.appendChild(addBtn);
   }
 
-  subscribe(render);
+  subscribe(render, (s) => s.savedViews);
   render();
 
   attachPopover({ trigger, panel });

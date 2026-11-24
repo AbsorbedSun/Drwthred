@@ -48,13 +48,14 @@ assert(scene.children.length === 1, `tras el 2do punto debe haber 1 mesh en la e
 
 // Punto degenerado (demasiado cerca) — no debe agregar vértices de más
 const meshBefore = scene.children[0];
-const vertsBefore = meshBefore.geometry.attributes.position.count;
+// El trazo en vivo usa buffers preasignados: lo que cuenta es el rango dibujado
+const vertsBefore = meshBefore.geometry.drawRange.count;
 engine.addPoint(new THREE.Vector3(0.5001, 0, 0)); // a menos del 35% del ancho de distancia
-const vertsAfterDegenerate = scene.children[0].geometry.attributes.position.count;
+const vertsAfterDegenerate = scene.children[0].geometry.drawRange.count;
 assert(vertsBefore === vertsAfterDegenerate, 'un punto demasiado cerca del anterior no debe agregarse');
 
 engine.addPoint(new THREE.Vector3(1, 0.5, 0)); // punto real, lejos
-const vertsAfterReal = scene.children[0].geometry.attributes.position.count;
+const vertsAfterReal = scene.children[0].geometry.drawRange.count;
 assert(vertsAfterReal > vertsBefore, 'un punto suficientemente lejos sí debe agregar geometría');
 
 const finishedStroke = engine.endStroke();

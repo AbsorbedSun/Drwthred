@@ -38,7 +38,7 @@ strokeEngine.endStroke();
 
 // ── Serializar ──
 const data = serializeProject(scene);
-assert(data.version === 1, 'debe traer un número de versión');
+assert(data.version === 2, 'debe traer un número de versión (formato v2)');
 assert(data.layers.length === 2, `debe serializar las 2 capas, serializó ${data.layers.length}`);
 assert(data.layers[1].visible === false, 'debe respetar la visibilidad de cada capa, no solo la activa');
 assert(data.activeLayerId === 'L2', 'debe serializar la capa activa');

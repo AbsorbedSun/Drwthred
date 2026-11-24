@@ -18,6 +18,13 @@ const originalColors = new Map(); // mesh -> color hex original, para restaurar 
 function selectableMeshes(scene) {
   return scene.children.filter((o) => o.userData && (o.userData.strokePoints || o.userData.primitiveKind));
 }
+/** Candidatos para raycast: visibles y con la matriz de mundo al día
+ * (con render bajo demanda puede no haberse actualizado desde el último cambio). */
+function pickable(scene) {
+  const list = selectableMeshes(scene).filter((o) => o.visible);
+  list.forEach((o) => o.updateMatrixWorld());
+  return list;
+}
 
 /** Hit-test puro, sin efectos secundarios — no toca el store. Separado
  * de selectAt() a propósito: el enrutador de herramientas necesita saber
@@ -25,7 +32,8 @@ function selectableMeshes(scene) {
  * (podría ser el primer dedo de un gesto de 2 dedos, ver tool-router.js). */
 export function hitTestAt(scene, camera, ndcX, ndcY) {
   raycaster.setFromCamera({ x: ndcX, y: ndcY }, camera);
-  const hits = raycaster.intersectObjects(selectableMeshes(scene), false);
+  // Solo lo visible: antes se podía seleccionar (y mover) algo de una capa oculta
+  const hits = raycaster.intersectObjects(pickable(scene), false);
   return hits.length ? hits[0].object.uuid : null;
 }
 
@@ -34,7 +42,7 @@ export function hitTestAt(scene, camera, ndcX, ndcY) {
  * y la herramienta Plano (llevar el plano hasta ese punto). */
 export function hitPointAt(scene, camera, ndcX, ndcY) {
   raycaster.setFromCamera({ x: ndcX, y: ndcY }, camera);
-  const hits = raycaster.intersectObjects(selectableMeshes(scene).filter((o) => o.visible), false);
+  const hits = raycaster.intersectObjects(pickable(scene), false);
   return hits.length ? hits[0].point.clone() : null;
 }
 
@@ -63,6 +71,6 @@ export function syncSelectionHighlight(scene) {
       }
     });
   }
-  subscribe(apply);
+  subscribe(apply, (s) => s.selectedId);
   apply();
 }

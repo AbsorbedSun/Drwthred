@@ -25,6 +25,7 @@ import { syncLayerVisibility } from './drawing/layers.js';
 import { syncSelectionHighlight } from './drawing/selection.js';
 import { createTransformController } from './drawing/transform.js';
 import { createPlaneGuide } from './drawing/plane-guide.js';
+import { BRUSHES } from './drawing/brushes.js';
 import { register } from './ui/hud-manager.js';
 import { toast } from './ui/toast.js';
 import { icon } from './ui/icons.js';
@@ -40,7 +41,7 @@ import { createHelpSheet } from './ui/help-sheet.js';
 
 // ── Escena ──
 const canvas = document.getElementById('scene-canvas');
-const { scene, camera, renderer, render } = createScene(canvas);
+const { scene, camera, renderer, render, renderIfNeeded, invalidate } = createScene(canvas);
 const camCtl = createCameraController(camera);
 const strokeEngine = createStrokeEngine(scene, camera);
 const mirrorEngine = createStrokeEngine(scene, camera); // trazo espejado en vivo
@@ -70,10 +71,14 @@ attachGestures(canvas, {
   },
   onUndo: doUndo,
   onRedo: doRedo,
+  onActivity: invalidate, // dibujar, borrar, mover: la escena cambió
 });
 
 // ── HUD: fila superior izquierda ──
-createFilePanel({ id: 'file-panel', slot: 'corner-top-left', order: 0, scene, strokeEngine, renderer, onToast: toast });
+createFilePanel({
+  id: 'file-panel', slot: 'corner-top-left', order: 0, scene, strokeEngine, renderer, onToast: toast,
+  exportOpts: { render, hide: [planeGuide.group, planeGuide.mirrorGroup, scene.getObjectByName('floor-grid')] },
+});
 createLayersPanel({ id: 'layers-panel', slot: 'corner-top-left', order: 1 });
 createViewsPanel({ id: 'views-panel', slot: 'corner-top-left', order: 2, camCtl });
 const help = createHelpSheet();
@@ -108,11 +113,10 @@ redoBtn.addEventListener('click', () => { if (!redo()) toast('Nada para rehacer'
 createToolbar({
   id: 'toolbar',
   tools: [
-    { id: 'brush', icon: icon('pencil'), label: 'Pincel', variants: [
-      { id: 'pencil', icon: icon('pencilThin'), label: 'Lápiz', brushWidth: 0.015 },
-      { id: 'marker', icon: icon('marker'), label: 'Marcador', brushWidth: 0.045 },
-      { id: 'airbrush', icon: icon('airbrush'), label: 'Trazo ancho', brushWidth: 0.09 },
-    ]},
+    // Los pinceles salen del catálogo (drawing/brushes.js): agregar uno ahí
+    // lo suma solo a este menú.
+    { id: 'brush', icon: icon('brush'), label: 'Pinceles', showVariant: true, layout: 'grid',
+      variants: BRUSHES.map((b) => ({ id: b.id, icon: icon(b.icon), label: b.label, brushWidth: b.width })) },
     { id: 'eraser', icon: icon('eraser'), label: 'Goma', variants: [
       { id: 'erase-full', icon: icon('eraseFull'), label: 'Borrar trazo entero' },
       { id: 'erase-partial', icon: icon('erasePartial'), label: 'Borrar una parte' },
@@ -120,7 +124,7 @@ createToolbar({
     { id: 'select', icon: icon('cursor'), label: 'Selección', variants: [
       { id: 'select-single', icon: icon('cursor'), label: 'Seleccionar y mover' },
     ]},
-    { id: 'shapes', icon: icon('shapes'), label: 'Figuras', variants: [
+    { id: 'shapes', icon: icon('shapes'), label: 'Figuras', showVariant: true, variants: [
       { id: 'cube', icon: icon('cube'), label: 'Cubo' },
       { id: 'plane', icon: icon('plane'), label: 'Plano' },
       { id: 'sphere', icon: icon('sphere'), label: 'Esfera' },
@@ -138,13 +142,16 @@ createPlaneBar({ id: 'plane-bar', order: 1, camCtl, camera, onToast: toast });
 const gizmo = createNavGizmo({ id: 'nav-gizmo', camCtl, camera });
 
 // Al cambiar de plano, avisar cuál quedó (feedback sin mirar la barra)
-let lastPlaneMode = getState().drawPlane.mode;
 subscribe(({ drawPlane }) => {
-  if (drawPlane.mode === lastPlaneMode) return;
-  lastPlaneMode = drawPlane.mode;
   const names = { view: 'Plano libre', front: 'Plano frente', side: 'Plano lado', ground: 'Plano suelo', custom: 'Plano propio' };
   toast(names[drawPlane.mode] || 'Plano');
-});
+}, (s) => s.drawPlane.mode);
+
+// Render bajo demanda: cualquier cambio de estado o de historial (deshacer
+// saca/pone meshes) marca la escena como sucia. Los movimientos de cámara
+// se detectan solos en scene.js.
+subscribe(invalidate);
+subscribeHistory(invalidate);
 
 // ── Atajos de teclado (extra para escritorio) ──
 document.addEventListener('keydown', (e) => {
@@ -169,9 +176,11 @@ window.__strokeEngine = strokeEngine;
 window.__scene = scene;
 window.__store = { getState, setState };
 
-(function loop() {
+function beforeRender() {
   planeGuide.update(camCtl.state.target);
   gizmo.draw();
-  render();
+}
+(function loop() {
+  renderIfNeeded(beforeRender);
   requestAnimationFrame(loop);
 })();

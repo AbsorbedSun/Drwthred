@@ -30,7 +30,7 @@ const TAP_MAX_MS = 280;
 const TAP_MAX_MOVE_PX = 14;
 const CANCEL_STROKE_MS = 260;
 
-export function attachGestures(el, { camCtl, router, transform, isPenMode, onPenDetected, onUndo, onRedo }) {
+export function attachGestures(el, { camCtl, router, transform, isPenMode, onPenDetected, onUndo, onRedo, onActivity }) {
   const pointers = new Map(); // pointerId -> {x, y, sx, sy}  (solo dedos que cuentan)
   const ignored = new Set();  // dedos apoyados mientras el lápiz dibujaba (palma)
   let penId = null;
@@ -55,8 +55,16 @@ export function attachGestures(el, { camCtl, router, transform, isPenMode, onPen
     if (pts.length < 2) return 0;
     return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
   }
+  // El rect del canvas se cachea: pedirlo en cada muestra del lápiz (hasta
+  // 240/s, varias por evento agrupado) forzaba al navegador a recalcular
+  // el layout una y otra vez.
+  let rect = el.getBoundingClientRect();
+  const refreshRect = () => { rect = el.getBoundingClientRect(); };
+  const ro = new ResizeObserver(refreshRect);
+  ro.observe(el);
+  window.addEventListener('scroll', refreshRect, { passive: true });
+
   function toNDC(x, y) {
-    const rect = el.getBoundingClientRect();
     return {
       x: ((x - rect.left) / rect.width) * 2 - 1,
       y: -(((y - rect.top) / rect.height) * 2 - 1),
@@ -119,6 +127,7 @@ export function attachGestures(el, { camCtl, router, transform, isPenMode, onPen
 
   // ───────────────────────── pointerdown ─────────────────────────
   function onDown(e) {
+    if (onActivity) onActivity();
     try { el.setPointerCapture(e.pointerId); } catch (err) { /* no crítico */ }
 
     // Mouse con botón derecho/medio → navegación directa
@@ -174,6 +183,7 @@ export function attachGestures(el, { camCtl, router, transform, isPenMode, onPen
 
   // ───────────────────────── pointermove ─────────────────────────
   function onMove(e) {
+    if (onActivity) onActivity();
     if (mouseNav && e.pointerType === 'mouse') {
       const dx = e.clientX - mouseNav.x, dy = e.clientY - mouseNav.y;
       mouseNav.x = e.clientX; mouseNav.y = e.clientY;
@@ -228,6 +238,7 @@ export function attachGestures(el, { camCtl, router, transform, isPenMode, onPen
 
   // ───────────────────────── pointerup / cancel ─────────────────────────
   function onUp(e, cancelled = false) {
+    if (onActivity) onActivity();
     if (mouseNav && e.pointerType === 'mouse' && e.button === mouseNav.button) {
       mouseNav = null;
       return;
@@ -264,6 +275,7 @@ export function attachGestures(el, { camCtl, router, transform, isPenMode, onPen
 
   function onWheel(e) {
     e.preventDefault();
+    if (onActivity) onActivity();
     // ctrlKey = pellizco en trackpad (el navegador lo reporta así)
     const k = e.ctrlKey ? 0.01 : 0.0015;
     camCtl.zoom(Math.exp(e.deltaY * k));
@@ -280,6 +292,8 @@ export function attachGestures(el, { camCtl, router, transform, isPenMode, onPen
   el.style.touchAction = 'none'; // el navegador no debe scrollear/zoomear la página
 
   return () => {
+    ro.disconnect();
+    window.removeEventListener('scroll', refreshRect);
     el.removeEventListener('pointerdown', onDown);
     el.removeEventListener('pointermove', onMove);
     el.removeEventListener('pointerup', onUp);

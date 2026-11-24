@@ -60,6 +60,6 @@ export function syncLayerVisibility(scene) {
       if (lid != null) obj.visible = visMap.get(lid) !== false;
     });
   }
-  subscribe(apply);
+  subscribe(apply, (s) => s.layers);
   apply();
 }

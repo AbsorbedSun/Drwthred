@@ -22,10 +22,12 @@ import {
   resolvePlane, isFixedPlane, normalOf, planeCenter, facingFactor,
   setPlaneOffset, planeThroughPoint, captureViewPlane, mirrorPoint, mirrorNormal,
 } from '../drawing/draw-planes.js';
-import { eraseFull, erasePartial } from '../drawing/eraser.js';
+import { eraseFull, erasePartial, createEraseBatch } from '../drawing/eraser.js';
 import { placePrimitive } from '../drawing/primitives.js';
 import { hitTestAt, hitPointAt } from '../drawing/selection.js';
 import { pushAction } from '../core/history.js';
+import { getBrush } from '../drawing/brushes.js';
+import * as THREE from '../vendor/three.module.js';
 
 const TAP_THRESHOLD = 0.03;   // en NDC — por debajo de esto, "onEnd" cuenta como toque, no arrastre
 const MAX_PROJECT_DIST = 60;  // puntos más lejos que esto = plano casi de canto, se descartan
@@ -46,6 +48,7 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
   let smooth = null;      // posición suavizada del puntero (NDC)
   let planeDrag = null;   // { startOffset, axis, len2, hitPoint }
   let usedMirror = false;
+  let eraseBatch = null;  // una pasada de goma = un solo paso de deshacer
 
   function isDrawing() {
     return active;
@@ -65,6 +68,15 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
     maxMove = 0;
     mode = activeTool;
 
+    const layer = st.layers.find((l) => l.id === activeLayerId);
+    if ((activeTool === 'brush' || activeTool === 'shapes') && layer && !layer.visible) {
+      // Dibujar en una capa oculta creaba trazos visibles "fantasma" que
+      // desaparecían al tocar cualquier capa.
+      mode = 'blocked';
+      if (onNotice) onNotice(`"${layer.name}" está oculta — mostrala para trabajar en ella`);
+      return;
+    }
+
     if (activeTool === 'brush') {
       const spec = st.drawPlane;
       if (isFixedPlane(spec) && facingFactor(spec, camera) < EDGE_ON_LIMIT) {
@@ -82,14 +94,19 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
       smooth = { x: ndcX, y: ndcY };
       const p = projectSafe(ndcX, ndcY);
       if (!p) { mode = 'blocked'; return; }
+      const brush = getBrush(activeVariant);
+      const nib = brush.nib ? nibAxis(drawPlane.normal) : null;
       const opts = {
         color: brushColor, width: brushWidth, meta: { layerId: activeLayerId },
-        pressure: pressureFactor(pressure, st.pressure), faceNormal,
+        pressure: pressureFactor(pressure, st.pressure), faceNormal, brush, nib,
       };
       strokeEngine.startStroke(p, opts);
       usedMirror = !!(st.mirror && mirrorEngine);
-      if (usedMirror) mirrorEngine.startStroke(mirrorPoint(p), { ...opts, faceNormal: mirrorNormal(faceNormal) });
+      if (usedMirror) {
+        mirrorEngine.startStroke(mirrorPoint(p), { ...opts, faceNormal: mirrorNormal(faceNormal), nib: mirrorNormal(nib) });
+      }
     } else if (activeTool === 'eraser') {
+      eraseBatch = createEraseBatch(scene);
       eraseAt(ndcX, ndcY, activeVariant);
     } else if (activeTool === 'select' || activeTool === 'shapes') {
       // Pegarle a algo YA es una decisión sin ambigüedad: selecciona y
@@ -103,6 +120,19 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
     } else if (activeTool === 'plane') {
       startPlaneDrag(ndcX, ndcY);
     }
+  }
+
+  /**
+   * Eje de la punta de caligrafía: la diagonal de la pantalla (45°, como se
+   * sostiene una pluma), apoyada en el plano de dibujo. Queda fijo durante
+   * todo el trazo, así el grosor depende solo de la dirección del trazo.
+   */
+  function nibAxis(planeNormal) {
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+    const nib = right.add(up);
+    nib.addScaledVector(planeNormal, -nib.dot(planeNormal));
+    return nib.lengthSq() > 1e-8 ? nib.normalize() : new THREE.Vector3(1, 0, 0);
   }
 
   function startPlaneDrag(ndcX, ndcY) {
@@ -121,8 +151,11 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
   }
 
   function eraseAt(ndcX, ndcY, variant) {
-    if (variant === 'erase-partial') erasePartial(scene, camera, ndcX, ndcY);
-    else eraseFull(scene, camera, ndcX, ndcY);
+    // El radio de la goma parcial sigue al grosor elegido (con un mínimo
+    // cómodo para el dedo), en vez de un 0.12 fijo.
+    const radius = Math.max(0.05, getState().brushWidth * 2.5);
+    if (variant === 'erase-partial') erasePartial(scene, camera, ndcX, ndcY, radius, { batch: eraseBatch });
+    else eraseFull(scene, camera, ndcX, ndcY, { batch: eraseBatch });
   }
 
   function addBrushPoint(ndcX, ndcY, pressure, raw = false) {
@@ -173,7 +206,9 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
   function onEnd(ndcX, ndcY, pressure = null) {
     const hasCoords = typeof ndcX === 'number' && typeof ndcY === 'number';
     const isTap = hasCoords && maxMove < TAP_THRESHOLD;
-    if (mode === 'brush') {
+    if (mode === 'eraser' && eraseBatch) {
+      eraseBatch.commit();
+    } else if (mode === 'brush') {
       // Con suavizado, la cinta va "atrás" del puntero — el último punto
       // real se agrega crudo para que el trazo termine donde se soltó.
       if (hasCoords) addBrushPoint(ndcX, ndcY, pressure, true);
@@ -200,7 +235,9 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
 
   /** Aborta lo que esté en curso sin dejar rastro ni entrada en el historial. */
   function cancel() {
-    if (mode === 'brush') {
+    if (mode === 'eraser' && eraseBatch) {
+      eraseBatch.commit(); // lo borrado, borrado está: no se "des-borra" por un 2º dedo
+    } else if (mode === 'brush') {
       strokeEngine.cancelStroke();
       if (usedMirror) mirrorEngine.cancelStroke();
     } else if (mode === 'moving' && transform) {
@@ -224,6 +261,7 @@ export function createToolRouter({ scene, camera, camCtl, strokeEngine, mirrorEn
     planeDrag = null;
     drawPlane = null;
     usedMirror = false;
+    eraseBatch = null;
   }
 
   return { isDrawing, onStart, onMove, onEnd, cancel, isTrivial };
